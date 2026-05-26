@@ -13,7 +13,7 @@ using BusCheckInV2.Views;
 
 namespace BusCheckInV2.ViewModels
 {
-    public partial class SeleccionDeFleteViewModel : ObservableObject
+    public partial class SeleccionDeFleteViewModel : BaseViewModel
     {
         private readonly ISQLiteService _databaseService;
         private readonly IAppUpdateService _appUpdateService;
@@ -123,17 +123,17 @@ namespace BusCheckInV2.ViewModels
                     return;
                 }
 
-                var provClave = SelectedProveedor.prov_clave;
+                var provClave = SelectedProveedor.ProvClave;
                 var idDestFlete = SelectedRuta.IdDestFlete;
                 var fletePersonal = new Tb_FlePer_FletePersonal
                 {
-                    FlePer_Fecha = DateTime.Now.ToString("MM/dd/yyyy"),
-                    FlePer_Hora = DateTime.Now.ToString("HH:mm:ss"),
-                    Prov_Clave = provClave,
+                    Fecha = DateTime.Now,
+                    Hora = DateTime.Now.TimeOfDay,
+                    ProvClave = provClave,
                     IdDestFlete = idDestFlete,
-                    FlePer_TipoFlete = SelectedTipoFlete,
-                    FlePer_TipoViaje = SelectedTipoViaje,
-                    FlePer_Chofer = NombreChofer,
+                    TipoFlete = SelectedTipoFlete,
+                    TipoViaje = SelectedTipoViaje,
+                    Chofer = NombreChofer,
                     IsSynced = false,
                 };
 
@@ -179,7 +179,7 @@ namespace BusCheckInV2.ViewModels
                 var todasRutas = await _databaseService.GetItemsAsync<Tb_FlePer_Ruta>();
 
                 var rutasFiltradas = provRutas
-                    .Where(r => r.Prov_Clave == proveedor.prov_clave)
+                    .Where(r => r.Prov_Clave == proveedor.ProvClave)
                     .Where(r => r.RutaStatus == "A")
                     .Join(todasRutas,
                         provRuta => provRuta.IdDestFlete,

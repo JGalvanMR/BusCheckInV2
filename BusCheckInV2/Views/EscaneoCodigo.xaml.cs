@@ -170,12 +170,12 @@ namespace BusCheckInV2.Views
                 if (_viewModel.HasPendingSyncOperations)
                 {
                     // Solo limpiar recursos no críticos, mantener datos pendientes
-                    _viewModel.CleanupNonCriticalResources();
+                    //_viewModel.CleanupNonCriticalResources();
                 }
                 else
                 {
                     // Limpiar completamente
-                    _viewModel.Cleanup();
+                    //_viewModel.Cleanup();
                 }
             }
             catch (Exception ex)
@@ -215,7 +215,7 @@ namespace BusCheckInV2.Views
         public void ForceCleanup()
         {
             LiberarCameraCompletamente();
-            _viewModel.Cleanup();
+            //_viewModel.Cleanup();
         }
         private void LiberarCamera()
         {
@@ -422,7 +422,7 @@ namespace BusCheckInV2.Views
             {
                 try
                 {
-                    await vm.ProcessBarcodeAsync(ManualEntry.Text);
+                    await vm.AddManualAsync();
                     // Solo limpiar si fue exitoso (ahora se maneja en el ViewModel)
                 }
                 catch (Exception ex)

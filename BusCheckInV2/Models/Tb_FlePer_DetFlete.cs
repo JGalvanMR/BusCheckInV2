@@ -1,23 +1,29 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using SQLite;
+﻿using SQLite;
+using System;
 
 namespace BusCheckInV2.Models
 {
     public class Tb_FlePer_DetFlete
     {
         [PrimaryKey, AutoIncrement]
-        public int Id { get; set; }  // ID local, no sincronizado
+        public int Id { get; set; }
 
-        public int? IdFletePer { get; set; }
-        public int? FlePer_CveNomina { get; set; }
-        public string? FlePer_Latitud { get; set; }
-        public string? FlePer_Longitud { get; set; }
-        public DateTime? FlePer_Fecha { get; set; }
+        [Column("IdFletePer")]
+        public long? IdFletePer { get; set; }
 
-        public bool IsSynced { get; set; } = false;  // Campo para sincronización
+        [Column("FlePer_CveNomina")]
+        public int? CveNomina { get; set; }
+
+        [Column("FlePer_Latitud")]
+        public double? Latitud { get; set; }
+
+        [Column("FlePer_Longitud")]
+        public double? Longitud { get; set; }
+
+        [Column("FlePer_Fecha")]
+        public DateTime? Fecha { get; set; }
+
+        // Campo local para sincronización
+        public bool IsSynced { get; set; } = false;
     }
 }

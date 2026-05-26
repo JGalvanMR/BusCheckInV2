@@ -63,33 +63,33 @@ namespace BusCheckInV2.Services
         {
             await InsertInitialDataIfNeededAsync(new List<Tb_Cat_Proveedor>
             {
-                new Tb_Cat_Proveedor { prov_clave = "TURISTICOS", prov_nombre = "JUAN CARLOS ACOSTA CABRERA" },
-                new Tb_Cat_Proveedor { prov_clave = "10810", prov_nombre = "RIVERA MONTESINO MARGARITA JACQUELINE" },
-                new Tb_Cat_Proveedor { prov_clave = "RAMIROGE", prov_nombre = "RAMIRO GARCIA ESTRADA" }
+                new Tb_Cat_Proveedor { ProvClave = "TURISTICOS", ProvNombre = "JUAN CARLOS ACOSTA CABRERA" },
+                new Tb_Cat_Proveedor { ProvClave = "10810", ProvNombre = "RIVERA MONTESINO MARGARITA JACQUELINE" },
+                new Tb_Cat_Proveedor { ProvClave = "RAMIROGE", ProvNombre = "RAMIRO GARCIA ESTRADA" }
                 // Otros proveedores
             });
 
             await InsertInitialDataIfNeededAsync(new List<Tb_FlePer_Ruta>
             {
-                new Tb_FlePer_Ruta { IdDestFlete = 1, NomDestFlete = "Yostiro", FleteCant = 4, FleteCosto = 900.00, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
-                new Tb_FlePer_Ruta { IdDestFlete = 2, NomDestFlete = "Carrizal - Peñuelas", FleteCant = 4, FleteCosto = 825.00, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
-                new Tb_FlePer_Ruta { IdDestFlete = 3, NomDestFlete = "4ta Brigada", FleteCant = 2, FleteCosto = 530.00, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
-                new Tb_FlePer_Ruta { IdDestFlete = 4, NomDestFlete = "Estanco - La Mesa", FleteCant = 2, FleteCosto = 530.00, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
-                new Tb_FlePer_Ruta { IdDestFlete = 5, NomDestFlete = "Doña Rosa - San Vicente", FleteCant = 2, FleteCosto = 550.00, DestStatus = "B", RutaCupo = 20, RutaVehiculo = "CAMIONETA" },
-                new Tb_FlePer_Ruta { IdDestFlete = 6, NomDestFlete = "Soledad", FleteCant = 0, FleteCosto = 530.00, DestStatus = "B", RutaCupo = 38, RutaVehiculo = "CAMION" },
-                new Tb_FlePer_Ruta { IdDestFlete = 7, NomDestFlete = "Zona Centro", FleteCant = 0, FleteCosto = 530.00, DestStatus = "B", RutaCupo = 0, RutaVehiculo = "" },
-                new Tb_FlePer_Ruta { IdDestFlete = 8, NomDestFlete = "Tomelopitos", FleteCant = 2, FleteCosto = 530.00, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
-                new Tb_FlePer_Ruta { IdDestFlete = 9, NomDestFlete = "Cardenas", FleteCant = 2, FleteCosto = 530.00, DestStatus = "A", RutaCupo = 20, RutaVehiculo = "CAMIONETA" },
-                new Tb_FlePer_Ruta { IdDestFlete = 10, NomDestFlete = "Oreja - Mocha", FleteCant = 4, FleteCosto = 530.00, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
-                new Tb_FlePer_Ruta { IdDestFlete = 11, NomDestFlete = "Mendoza Temascatio", FleteCant = 2, FleteCosto = 530.00, DestStatus = "A", RutaCupo = 38, RutaVehiculo = "CAMION" },
-                new Tb_FlePer_Ruta { IdDestFlete = 12, NomDestFlete = "San Cayetano - Apatzingan", FleteCant = 2, FleteCosto = 530.00, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMIONETA" },
-                new Tb_FlePer_Ruta { IdDestFlete = 13, NomDestFlete = "Purísima - Malvas", FleteCant = 1, FleteCosto = 530.00, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMIONETA" },
-                new Tb_FlePer_Ruta { IdDestFlete = 14, NomDestFlete = "San Juan - Nicolas", FleteCant = 4, FleteCosto = 650.00, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMIONETA" },
-                new Tb_FlePer_Ruta { IdDestFlete = 15, NomDestFlete = "Soledad - Centro", FleteCant = 2, FleteCosto = 1150.00, DestStatus = "A", RutaCupo = 38, RutaVehiculo = "CAMION" },
-                new Tb_FlePer_Ruta { IdDestFlete = 16, NomDestFlete = "LIMPIEZA NOCTURNA", FleteCant = 2, FleteCosto = 530.00, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
-                new Tb_FlePer_Ruta { IdDestFlete = 17, NomDestFlete = "LOMA DE FLORES", FleteCant = 2, FleteCosto = 530.00, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
-                new Tb_FlePer_Ruta { IdDestFlete = 18, NomDestFlete = "LOMA DE FLORES - MENDOZA", FleteCant = 2, FleteCosto = 530.00, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
-                new Tb_FlePer_Ruta { IdDestFlete = 19, NomDestFlete = "Cardenas-DoñaRosa-San Vicente", FleteCant = 2, FleteCosto = 1100.00, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" }
+                new Tb_FlePer_Ruta { IdDestFlete = 1, NomDestFlete = "Yostiro", FleteCant = 4, FleteCosto = 900.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 2, NomDestFlete = "Carrizal - Peñuelas", FleteCant = 4, FleteCosto = 825.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 3, NomDestFlete = "4ta Brigada", FleteCant = 2, FleteCosto = 530.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 4, NomDestFlete = "Estanco - La Mesa", FleteCant = 2, FleteCosto = 530.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 5, NomDestFlete = "Doña Rosa - San Vicente", FleteCant = 2, FleteCosto = 550.00m, DestStatus = "B", RutaCupo = 20, RutaVehiculo = "CAMIONETA" },
+                new Tb_FlePer_Ruta { IdDestFlete = 6, NomDestFlete = "Soledad", FleteCant = 0, FleteCosto = 530.00m, DestStatus = "B", RutaCupo = 38, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 7, NomDestFlete = "Zona Centro", FleteCant = 0, FleteCosto = 530.00m, DestStatus = "B", RutaCupo = 0, RutaVehiculo = "" },
+                new Tb_FlePer_Ruta { IdDestFlete = 8, NomDestFlete = "Tomelopitos", FleteCant = 2, FleteCosto = 530.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 9, NomDestFlete = "Cardenas", FleteCant = 2, FleteCosto = 530.00m, DestStatus = "A", RutaCupo = 20, RutaVehiculo = "CAMIONETA" },
+                new Tb_FlePer_Ruta { IdDestFlete = 10, NomDestFlete = "Oreja - Mocha", FleteCant = 4, FleteCosto = 530.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 11, NomDestFlete = "Mendoza Temascatio", FleteCant = 2, FleteCosto = 530.00m, DestStatus = "A", RutaCupo = 38, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 12, NomDestFlete = "San Cayetano - Apatzingan", FleteCant = 2, FleteCosto = 530.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMIONETA" },
+                new Tb_FlePer_Ruta { IdDestFlete = 13, NomDestFlete = "Purísima - Malvas", FleteCant = 1, FleteCosto = 530.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMIONETA" },
+                new Tb_FlePer_Ruta { IdDestFlete = 14, NomDestFlete = "San Juan - Nicolas", FleteCant = 4, FleteCosto = 650.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMIONETA" },
+                new Tb_FlePer_Ruta { IdDestFlete = 15, NomDestFlete = "Soledad - Centro", FleteCant = 2, FleteCosto = 1150.00m, DestStatus = "A", RutaCupo = 38, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 16, NomDestFlete = "LIMPIEZA NOCTURNA", FleteCant = 2, FleteCosto = 530.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 17, NomDestFlete = "LOMA DE FLORES", FleteCant = 2, FleteCosto = 530.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 18, NomDestFlete = "LOMA DE FLORES - MENDOZA", FleteCant = 2, FleteCosto = 530.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 19, NomDestFlete = "Cardenas-DoñaRosa-San Vicente", FleteCant = 2, FleteCosto = 1100.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" }
                 // Otros rutas
             });
 
@@ -205,12 +205,12 @@ namespace BusCheckInV2.Services
                 var fechaLimite = DateTime.Now.AddDays(-diasAtras);
 
                 var query = _database.Table<Tb_FlePer_FletePersonal>()
-                    .Where(f => f.FlePer_Fecha != null);
+                    .Where(f => f.Fecha != null);
 
                 // Filtrar por chofer si se especifica
                 if (!string.IsNullOrEmpty(chofer))
                 {
-                    query = query.Where(f => f.FlePer_Chofer == chofer);
+                    query = query.Where(f => f.Chofer == chofer);
                 }
 
                 var fletes = await query.ToListAsync();
@@ -218,13 +218,14 @@ namespace BusCheckInV2.Services
                 // Filtrar por fecha manualmente
                 var fletesFiltrados = fletes.Where(f =>
                 {
-                    if (DateTime.TryParse(f.FlePer_Fecha, out DateTime fechaFlete))
-                    {
-                        return fechaFlete >= fechaLimite;
-                    }
-                    return false;
+                    return f.Fecha >= fechaLimite;
+                    //if (DateTime.TryParse(f.Fecha, out DateTime fechaFlete))
+                    //{
+                    //    return fechaFlete >= fechaLimite;
+                    //}
+                    //return false;
                 })
-                .Where(f => f.FlePer_Status != "Completado" && f.FlePer_Status != "Cancelado")
+                .Where(f => f.Status != "Completado" && f.Status != "Cancelado")
                 .ToList();
 
                 // Obtener todas las rutas y proveedores para mapeo
@@ -245,16 +246,16 @@ namespace BusCheckInV2.Services
                     }
 
                     // Buscar nombre del proveedor
-                    string nombreProveedor = flete.Prov_Clave ?? "Desconocido";
-                    if (!string.IsNullOrEmpty(flete.Prov_Clave))
+                    string nombreProveedor = flete.ProvClave ?? "Desconocido";
+                    if (!string.IsNullOrEmpty(flete.ProvClave))
                     {
-                        var proveedor = todosProveedores.FirstOrDefault(p => p.prov_clave == flete.Prov_Clave);
-                        nombreProveedor = proveedor?.prov_nombre ?? flete.Prov_Clave;
+                        var proveedor = todosProveedores.FirstOrDefault(p => p.ProvClave == flete.ProvClave);
+                        nombreProveedor = proveedor?.ProvNombre ?? flete.ProvClave;
                     }
 
                     // Parsear fecha y hora
                     DateTime fechaHora = DateTime.Now;
-                    if (DateTime.TryParse($"{flete.FlePer_Fecha} {flete.FlePer_Hora}", out DateTime parsedFecha))
+                    if (DateTime.TryParse($"{flete.Fecha} {flete.Hora}", out DateTime parsedFecha))
                     {
                         fechaHora = parsedFecha;
                     }
@@ -262,18 +263,18 @@ namespace BusCheckInV2.Services
                     resultado.Add(new FletePendienteUI
                     {
                         Id = flete.Id,
-                        IdFletePer = flete.IdFletePer,
+                        IdFletePer = (int?)flete.IdFletePer,
                         Ruta = nombreRuta,
                         FechaHora = fechaHora,
                         Proveedor = nombreProveedor,
-                        Chofer = flete.FlePer_Chofer ?? "Desconocido",
-                        Estatus = flete.FlePer_Status ?? "Pendiente",
-                        CantidadEsperada = flete.FlePer_Cantidad,
-                        CantidadReal = flete.FlePer_CantidadReal,
-                        TipoFlete = flete.FlePer_TipoFlete ?? "NORMAL",
-                        TipoViaje = flete.FlePer_TipoViaje ?? "TRAER GENTE",
-                        FechaInicio = flete.FlePer_FechaInicio,
-                        FechaFin = flete.FlePer_FechaFin
+                        Chofer = flete.Chofer ?? "Desconocido",
+                        Estatus = flete.Status ?? "Pendiente",
+                        CantidadEsperada = flete.Cantidad,
+                        CantidadReal = flete.Cantidad,
+                        TipoFlete = flete.TipoFlete ?? "NORMAL",
+                        TipoViaje = flete.TipoViaje ?? "TRAER GENTE",
+                        FechaInicio = flete.Fecha,
+                        FechaFin = flete.FechaFin
                     });
                 }
 
@@ -291,12 +292,12 @@ namespace BusCheckInV2.Services
             try
             {
                 var choferes = await _database.Table<Tb_FlePer_FletePersonal>()
-                    .Where(f => !string.IsNullOrEmpty(f.FlePer_Chofer))
-                    .OrderBy(f => f.FlePer_Chofer)
+                    .Where(f => !string.IsNullOrEmpty(f.Chofer))
+                    .OrderBy(f => f.Chofer)
                     .ToListAsync();
 
                 return choferes
-                    .Select(f => f.FlePer_Chofer)
+                    .Select(f => f.Chofer)
                     .Distinct()
                     .ToList();
             }
@@ -316,22 +317,22 @@ namespace BusCheckInV2.Services
 
                 if (flete == null) return false;
 
-                flete.FlePer_Status = nuevoEstatus;
+                flete.Status = nuevoEstatus;
                 flete.IsSynced = false; // Marcar para sincronizar
 
                 if (cantidadReal.HasValue)
                 {
-                    flete.FlePer_CantidadReal = cantidadReal.Value;
+                    flete.Cantidad = cantidadReal.Value;
                 }
 
                 if (!string.IsNullOrEmpty(observaciones))
                 {
-                    flete.FlePer_Observaciones = observaciones;
+                    flete.Observaciones = observaciones;
                 }
 
                 if (nuevoEstatus == "Completado" || nuevoEstatus == "Cancelado")
                 {
-                    flete.FlePer_FechaFin = DateTime.Now;
+                    flete.FechaFin = DateTime.Now;
                 }
 
                 var resultado = await _database.UpdateAsync(flete);
@@ -351,10 +352,10 @@ namespace BusCheckInV2.Services
                 var detalle = new Tb_FlePer_DetFlete
                 {
                     IdFletePer = idFletePer,
-                    FlePer_CveNomina = cveNomina,
-                    FlePer_Latitud = latitud.ToString(),
-                    FlePer_Longitud = longitud.ToString(),
-                    FlePer_Fecha = DateTime.Now,
+                    CveNomina = cveNomina,
+                    Latitud = latitud,
+                    Longitud = longitud,
+                    Fecha = DateTime.Now,
                     IsSynced = false
                 };
 
@@ -432,18 +433,18 @@ namespace BusCheckInV2.Services
                 // Convertir a formato de sincronización
                 var fletesSync = fletesNoSincronizados.Select(f => new FleteSincronizacion
                 {
-                    IdFletePer = f.IdFletePer ?? 0,
-                    Fecha = f.FlePer_Fecha,
-                    Hora = f.FlePer_Hora,
-                    ProvClave = f.Prov_Clave,
-                    IdDestFlete = f.IdDestFlete ?? 0,
-                    TipoFlete = f.FlePer_TipoFlete,
-                    TipoViaje = f.FlePer_TipoViaje,
-                    Cantidad = f.FlePer_Cantidad ?? 0,
-                    Status = f.FlePer_Status,
-                    Chofer = f.FlePer_Chofer,
-                    CantidadReal = f.FlePer_CantidadReal,
-                    Observaciones = f.FlePer_Observaciones,
+                    IdFletePer = (int)(f.IdFletePer ?? 0),
+                    Fecha = (DateTime)f.Fecha,
+                    Hora = (TimeSpan)f.Hora,
+                    ProvClave = f.ProvClave,
+                    IdDestFlete = (int)(f.IdDestFlete ?? 0),
+                    TipoFlete = f.TipoFlete,
+                    TipoViaje = f.TipoViaje,
+                    Cantidad = f.Cantidad ?? 0,
+                    Status = f.Status,
+                    Chofer = f.Chofer,
+                    CantidadReal = f.Cantidad,
+                    Observaciones = f.Observaciones,
                     IsSynced = f.IsSynced
                 }).ToList();
 
@@ -477,20 +478,21 @@ namespace BusCheckInV2.Services
                 var fechaLimite = DateTime.Now.AddDays(-dias);
 
                 var query = _database.Table<Tb_FlePer_FletePersonal>()
-                    .Where(f => f.FlePer_Chofer == chofer && f.FlePer_Fecha != null);
+                    .Where(f => f.Chofer == chofer && f.Fecha != null);
 
                 var fletes = await query.ToListAsync();
 
                 // Filtrar por fecha y estado
                 var fletesFiltrados = fletes.Where(f =>
                 {
-                    if (DateTime.TryParse(f.FlePer_Fecha, out DateTime fechaFlete))
-                    {
-                        return fechaFlete >= fechaLimite;
-                    }
-                    return false;
+                    return f.Fecha >= fechaLimite;
+                    //if (DateTime.TryParse(f.Fecha, out DateTime fechaFlete))
+                    //{
+                    //    return fechaFlete >= fechaLimite;
+                    //}
+                    //return false;
                 })
-                .Where(f => f.FlePer_Status != "Completado" && f.FlePer_Status != "Cancelado")
+                .Where(f => f.Status != "Completado" && f.Status != "Cancelado")
                 .ToList();
 
                 // Obtener información de rutas y proveedores
@@ -510,16 +512,16 @@ namespace BusCheckInV2.Services
                         nombreRuta = ruta?.NomDestFlete ?? "Ruta desconocida";
                     }
 
-                    string nombreProveedor = flete.Prov_Clave ?? "Desconocido";
-                    if (!string.IsNullOrEmpty(flete.Prov_Clave))
+                    string nombreProveedor = flete.ProvClave ?? "Desconocido";
+                    if (!string.IsNullOrEmpty(flete.ProvClave))
                     {
-                        var proveedor = todosProveedores.FirstOrDefault(p => p.prov_clave == flete.Prov_Clave);
-                        nombreProveedor = proveedor?.prov_nombre ?? flete.Prov_Clave;
+                        var proveedor = todosProveedores.FirstOrDefault(p => p.ProvClave == flete.ProvClave);
+                        nombreProveedor = proveedor?.ProvNombre ?? flete.ProvClave;
                     }
 
                     // Parsear fecha y hora
                     DateTime fechaHora = DateTime.Now;
-                    if (DateTime.TryParse($"{flete.FlePer_Fecha} {flete.FlePer_Hora}", out DateTime parsedFecha))
+                    if (DateTime.TryParse($"{flete.Fecha} {flete.Hora}", out DateTime parsedFecha))
                     {
                         fechaHora = parsedFecha;
                     }
@@ -527,18 +529,18 @@ namespace BusCheckInV2.Services
                     resultado.Add(new FletePendienteUI
                     {
                         Id = flete.Id,
-                        IdFletePer = flete.IdFletePer,
+                        IdFletePer = (int?)flete.IdFletePer,
                         Ruta = nombreRuta,
                         FechaHora = fechaHora,
                         Proveedor = nombreProveedor,
-                        Chofer = flete.FlePer_Chofer ?? "Desconocido",
-                        Estatus = flete.FlePer_Status ?? "Pendiente",
-                        CantidadEsperada = flete.FlePer_Cantidad,
-                        CantidadReal = flete.FlePer_CantidadReal,
-                        TipoFlete = flete.FlePer_TipoFlete ?? "NORMAL",
-                        TipoViaje = flete.FlePer_TipoViaje ?? "TRAER GENTE",
-                        FechaInicio = flete.FlePer_FechaInicio,
-                        FechaFin = flete.FlePer_FechaFin
+                        Chofer = flete.Chofer ?? "Desconocido",
+                        Estatus = flete.Status ?? "Pendiente",
+                        CantidadEsperada = flete.Cantidad,
+                        CantidadReal = flete.Cantidad,
+                        TipoFlete = flete.TipoFlete ?? "NORMAL",
+                        TipoViaje = flete.TipoViaje ?? "TRAER GENTE",
+                        FechaInicio = flete.Fecha,
+                        FechaFin = flete.FechaFin
                     });
                 }
 
@@ -558,17 +560,17 @@ namespace BusCheckInV2.Services
                 var fleteLocal = new Tb_FlePer_FletePersonal
                 {
                     IdFletePer = flete.IdFletePer,
-                    FlePer_Fecha = flete.Fecha,
-                    FlePer_Hora = flete.Hora,
-                    Prov_Clave = flete.ProveedorClave,
+                    Fecha = flete.Fecha,
+                    Hora = flete.Hora,
+                    ProvClave = flete.ProveedorClave,
                     IdDestFlete = flete.IdDestFlete,
-                    FlePer_TipoFlete = flete.TipoFlete,
-                    FlePer_TipoViaje = flete.TipoViaje,
-                    FlePer_Cantidad = flete.Cantidad,
-                    FlePer_Status = flete.Estatus,
-                    FlePer_Chofer = flete.Chofer,
-                    FlePer_CantidadReal = flete.CantidadReal,
-                    FlePer_Observaciones = flete.Observaciones,
+                    TipoFlete = flete.TipoFlete,
+                    TipoViaje = flete.TipoViaje,
+                    Cantidad = flete.Cantidad,
+                    Status = flete.Estatus,
+                    Chofer = flete.Chofer,
+                    //FlePer_CantidadReal = flete.CantidadReal,
+                    Observaciones = flete.Observaciones,
                     IsSynced = true
                 };
 

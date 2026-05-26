@@ -15,7 +15,7 @@ namespace BusCheckInV2.Models
         public int? IdDestFlete { get; set; }
         public string NomDestFlete { get; set; }
         public int? FleteCant { get; set; }
-        public double? FleteCosto { get; set; }
+        public decimal? FleteCosto { get; set; }
         public string DestStatus { get; set; }
         public int? RutaCupo { get; set; }
         public string RutaVehiculo { get; set; }

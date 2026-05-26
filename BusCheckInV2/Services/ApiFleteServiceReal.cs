@@ -104,54 +104,55 @@ namespace BusCheckInV2.Services
             return response?.Success == true ? response.Data : new List<UsuarioApi>();
         }
 
-        public async Task<List<FletePendienteUI>> ObtenerFletesPorChoferAsync(string chofer, DateTime fechaDesde)
+        public async Task<ApiResponse<List<FleteResponse>>> ObtenerFletesPorChoferAsync(
+        string chofer,
+        int dias = 3,
+        bool soloPendientes = false)
         {
             try
             {
-                // Calcular los días desde la fechaDesde
-                int dias = (DateTime.Today - fechaDesde.Date).Days;
-                if (dias <= 0)
-                    dias = 1; // Mínimo 1 día
-
-                var url = $"{GetBaseUrl()}/ObtenerFletesPorChofer?chofer={Uri.EscapeDataString(chofer)}&dias={dias}";
-
-                var response = await ExecuteApiCallAsync<ApiResponse<List<FleteResponse>>>(
-                    () => _httpClient.GetAsync(url), "ObtenerFletesPorChofer");
-
-                if (response?.Success == true)
+                // Construir parámetros de consulta
+                var parameters = new Dictionary<string, string>
                 {
-                    // Convertir FleteResponse a FletePendienteUI
-                    var fletesUI = response.Data.Select(f => new FletePendienteUI
-                    {
-                        IdFletePer = f.IdFletePer,
-                        Fecha = f.Fecha,
-                        Hora = f.Hora,
-                        ProveedorClave = f.ProveedorClave,
-                        ProveedorNombre = f.ProveedorNombre,
-                        IdDestFlete = f.IdDestFlete,
-                        RutaNombre = f.RutaNombre,
-                        TipoFlete = f.TipoFlete,
-                        TipoViaje = f.TipoViaje,
-                        Cantidad = f.Cantidad,
-                        Estatus = f.Estatus,
-                        Chofer = f.Chofer,
-                        CantidadReal = f.CantidadReal,
-                        Observaciones = f.Observaciones,
-                        FechaInicio = f.FechaInicio,
-                        FechaFin = f.FechaFin,
-                        PuntosRegistrados = f.PuntosRegistrados,
-                        EsPendiente = f.Estatus == "Pendiente" || f.Estatus == "Iniciado" || f.Estatus == "Inconcluso"
-                    }).ToList();
+                    ["chofer"] = chofer,
+                    ["dias"] = dias.ToString(),
+                    ["soloPendientes"] = soloPendientes.ToString().ToLower()
+                };
 
-                    return fletesUI;
+                var queryString = new FormUrlEncodedContent(parameters).ReadAsStringAsync().Result;
+                var url = $"{GetBaseUrl()}/ObtenerFletesPorChofer?{queryString}";
+
+                _logger.LogInformation($"Llamando API: {url}");
+
+                var response = await _httpClient.GetAsync(url);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var jsonResponse = await response.Content.ReadAsStringAsync();
+                    var result = JsonSerializer.Deserialize<ApiResponse<List<FleteResponse>>>(
+                        jsonResponse,
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                    return result;
                 }
-
-                return new List<FletePendienteUI>();
+                else
+                {
+                    _logger.LogError($"Error API: {response.StatusCode}");
+                    return new ApiResponse<List<FleteResponse>>
+                    {
+                        Success = false,
+                        Message = $"Error del servidor: {response.StatusCode}"
+                    };
+                }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error en ObtenerFletesPorChoferAsync");
-                return new List<FletePendienteUI>();
+                _logger.LogError(ex, "Error al consumir el API de fletes");
+                return new ApiResponse<List<FleteResponse>>
+                {
+                    Success = false,
+                    Message = "Error de conexión con el servidor"
+                };
             }
         }
 
@@ -277,36 +278,49 @@ namespace BusCheckInV2.Services
         // Métodos de caché local
         private async Task GuardarFletesEnCache(List<FleteApi> fletes)
         {
-            foreach (var flete in fletes)
+            try
             {
-                // Convertir de FleteApi a Tb_FlePer_FletePersonal
-                var fleteLocal = new Tb_FlePer_FletePersonal
+                foreach (var flete in fletes)
                 {
-                    IdFletePer = flete.IdFletePer,
-                    FlePer_Fecha = flete.Fecha,
-                    FlePer_Hora = flete.Hora,
-                    Prov_Clave = flete.ProveedorClave,
-                    IdDestFlete = flete.IdDestFlete,
-                    FlePer_TipoFlete = flete.TipoFlete,
-                    FlePer_TipoViaje = flete.TipoViaje,
-                    FlePer_Cantidad = flete.Cantidad,
-                    FlePer_Status = flete.Estatus,
-                    FlePer_Chofer = flete.Chofer,
-                    FlePer_CantidadReal = flete.CantidadReal,
-                    FlePer_Observaciones = flete.Observaciones,
-                    IsSynced = true // Ya están sincronizados desde API
-                };
+                    // Parsear fecha/hora de la API (viene como string)
+                    DateTime fecha = DateTime.TryParse(flete.Fecha, out var f) ? f : DateTime.Now;
+                    TimeSpan hora = TimeSpan.TryParse(flete.Hora, out var h) ? h : TimeSpan.Zero;
 
-                // Verificar si ya existe
-                var existe = await _sqliteService.ExisteFleteAsync(flete.IdFletePer);
-                if (existe)
-                {
-                    await _sqliteService.UpdateAsync(fleteLocal);
+                    // Convertir de FleteApi a Tb_FlePer_FletePersonal
+                    var fleteLocal = new Tb_FlePer_FletePersonal
+                    {
+                        IdFletePer = flete.IdFletePer,              // long? 
+                        Fecha = fecha,                              // DateTime? (mapeado a FlePer_Fecha)
+                        Hora = hora,                                // TimeSpan? (mapeado a FlePer_Hora)
+                        ProvClave = flete.ProveedorClave,           // string? (mapeado a Prov_Clave)
+                        IdDestFlete = flete.IdDestFlete,            // long? (mapeado a IdDestFlete)
+                        TipoFlete = flete.TipoFlete,                // string? (mapeado a FlePer_TipoFlete)
+                        TipoViaje = flete.TipoViaje,                // string? (mapeado a FlePer_TipoViaje)
+                        Cantidad = flete.Cantidad,                  // int? (mapeado a FlePer_Cantidad)
+                        Status = flete.Estatus,                     // string? (mapeado a FlePer_Status)
+                        Chofer = flete.Chofer,                      // string? (mapeado a FlePer_Chofer)
+                        //CantidadReal = flete.CantidadReal,          // int? (mapeado a FlePer_CantidadReal)
+                        Observaciones = flete.Observaciones,        // string? (mapeado a FlePer_Observaciones)
+                        IsSynced = true                             // Campo local
+                    };
+
+                    // Verificar si ya existe
+                    var existe = await _sqliteService.ExisteFleteAsync(flete.IdFletePer);
+                    if (existe)
+                    {
+                        await _sqliteService.UpdateAsync(fleteLocal);
+                        _logger.LogDebug("Flete {IdFletePer} actualizado en caché", flete.IdFletePer);
+                    }
+                    else
+                    {
+                        await _sqliteService.InsertAsync(fleteLocal);
+                        _logger.LogDebug("Flete {IdFletePer} insertado en caché", flete.IdFletePer);
+                    }
                 }
-                else
-                {
-                    await _sqliteService.InsertAsync(fleteLocal);
-                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error guardando fletes en caché");
             }
         }
 

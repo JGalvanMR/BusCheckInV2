@@ -1,20 +1,19 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using SQLite;
+﻿using SQLite;
+using System.ComponentModel.DataAnnotations;
 
 namespace BusCheckInV2.Models
 {
     public class Tb_Cat_Proveedor
     {
         [PrimaryKey, AutoIncrement]
-        public int Id { get; set; }  // ID local, no sincronizado
+        public int Id { get; set; }
 
-        public string prov_clave { get; set; }
-        public string prov_nombre { get; set; }
+        [Column("prov_clave"), SQLite.MaxLength(10), Indexed]
+        public string? ProvClave { get; set; }
 
-        public bool IsSynced { get; set; } = false;  // Campo para sincronización
+        [Column("prov_nombre"), SQLite.MaxLength(100)]
+        public string? ProvNombre { get; set; }
+
+        public bool IsSynced { get; set; } = false;
     }
 }

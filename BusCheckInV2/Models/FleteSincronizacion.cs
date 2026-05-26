@@ -9,8 +9,8 @@ namespace BusCheckInV2.Models
     public class FleteSincronizacion
     {
         public int IdFletePer { get; set; }
-        public string Fecha { get; set; }
-        public string Hora { get; set; }
+        public DateTime Fecha { get; set; }
+        public TimeSpan Hora { get; set; }
         public string ProvClave { get; set; }
         public int IdDestFlete { get; set; }
         public string TipoFlete { get; set; }

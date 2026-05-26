@@ -9,8 +9,8 @@ namespace BusCheckInV2.Models
     public class FleteApi
     {
         public int IdFletePer { get; set; }
-        public string Fecha { get; set; }
-        public string Hora { get; set; }
+        public DateTime Fecha { get; set; }
+        public TimeSpan Hora { get; set; }
         public string ProveedorClave { get; set; }
         public string ProveedorNombre { get; set; }
         public int IdDestFlete { get; set; }

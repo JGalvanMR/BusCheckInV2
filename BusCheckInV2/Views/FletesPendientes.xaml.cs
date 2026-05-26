@@ -19,9 +19,9 @@ namespace BusCheckInV2.Views
                 if (!string.IsNullOrEmpty(viewModel.ChoferSeleccionado))
                 {
                     // Usar el comando en lugar de llamar directamente al método
-                    if (viewModel.CargarFletesComando.CanExecute(null))
+                    if (viewModel.CargarFletesPendientesCommand.CanExecute(null))
                     {
-                        viewModel.CargarFletesComando.Execute(null);
+                        viewModel.CargarFletesPendientesCommand.Execute(null);
                     }
                 }
             }

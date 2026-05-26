@@ -5,78 +5,52 @@
              xmlns:barcode="clr-namespace:BarcodeScanning;assembly=BarcodeScanning.Native.Maui"
              x:Class="BusCheckInV2.Views.EscaneoCodigo"
              Title="Check-in de Pasajeros"
-             x:DataType="{x:Type viewmodels:EscaneoCodigoViewModel}"
-             Shell.PresentationMode="ModalAnimated"
+             x:DataType="viewmodels:EscaneoCodigoViewModel"
              Unloaded="ContentPage_Unloaded">
-    <Grid x:Name="MainGrid"
-          Padding="16,8"
+
+    <Grid Padding="16,8"
           RowDefinitions="Auto,*,Auto,Auto"
           RowSpacing="12">
-
-        <!--  Barra superior fija  -->
-        <Grid Grid.Row="0"
-              ColumnDefinitions="*,Auto,Auto"
-              ColumnSpacing="12"
-              VerticalOptions="Center">
-            <Border Style="{StaticResource CardFrameStyle}" VerticalOptions="Center">
-                <Label x:Name="TotalPasajerosLabel"
+        <!--  Header  -->
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto">
+            <Border Style="{StaticResource CardFrameStyle}">
+                <Label Text="{Binding TotalPasajerosText}"
                        FontAttributes="Bold"
-                       FontAutoScalingEnabled="True"
-                       FontFamily="AmsiProRegular"
                        FontSize="Medium"
-                       Style="{StaticResource CardTitleLabelStyle}"
-                       Text="{Binding TotalPasajerosText}"
-                       VerticalOptions="Center" />
+                       Style="{StaticResource CardTitleLabelStyle}" />
             </Border>
             <Grid Grid.Column="1" RowDefinitions="Auto,Auto">
-                <!--  Indicador de conexión  -->
                 <Label Grid.Row="0"
                        Text="{Binding IsConnected, Converter={StaticResource ConnectionStatusConverter}}"
-                       TextColor="{Binding IsConnected, Converter={StaticResource ConnectionColorConverter}}"
-                       VerticalOptions="Center" />
-                <!--  Estado de sincronización  -->
+                       TextColor="{Binding IsConnected, Converter={StaticResource ConnectionColorConverter}}" />
                 <Label Grid.Row="1"
                        Text="{Binding SyncStatus}"
-                       TextColor="{Binding SyncStatus, Converter={StaticResource StatusToColorConverter}}"
-                       VerticalOptions="Center" />
+                       TextColor="{Binding SyncStatus, Converter={StaticResource StatusToColorConverter}}" />
             </Grid>
-            <Button x:Name="btnEscanear"
-                    Grid.Column="2"
+            <Button Grid.Column="2"
+                    Text="{Binding TextoBotonEscaneo}"
                     Command="{Binding ToggleScanCommand}"
-                    FontFamily="AmsiProRegular"
                     IsEnabled="{Binding CanScan}"
-                    Style="{StaticResource PrimaryButtonStyle}"
-                    Text="{Binding TextoBotonEscaneo}" />
+                    Style="{StaticResource PrimaryButtonStyle}" />
         </Grid>
 
-        <!--  Cámara  -->
+        <!--  Camera  -->
         <Border Grid.Row="1"
-                Margin="0,8,0,8"
-                Padding="0"
-                Background="Black"
-                Stroke="White"
                 StrokeShape="RoundRectangle 16"
-                StrokeThickness="1">
+                StrokeThickness="1"
+                Background="Black">
             <Grid x:Name="CameraContainer">
-                <Grid BackgroundColor="#AA000000" IsVisible="{Binding IsSyncing}">
-                    <ActivityIndicator IsRunning="False" Color="White" />
-                    <Label FontAttributes="Bold"
-                           FontAutoScalingEnabled="True"
-                           FontFamily="AmsiProRegular"
-                           FontSize="Medium"
-                           HorizontalOptions="Center"
-                           Text="Sincronizando..."
-                           TextColor="White"
-                           VerticalOptions="Center" />
-                </Grid>
-                <!--  Botón de Flash superpuesto en esquina  -->
+                <ActivityIndicator IsVisible="{Binding IsSyncing}"
+                                   IsRunning="{Binding IsSyncing}"
+                                   HorizontalOptions="Center"
+                                   VerticalOptions="Center"
+                                   Color="White" />
                 <Button Margin="10"
+                        IsVisible="{Binding IsScanning}"
+                        Text="Flash"
+                        Command="{Binding ToggleTorchCommand}"
                         HorizontalOptions="End"
                         VerticalOptions="Start"
-                        FontFamily="AmsiProRegular"
-                        Command="{Binding ToggleTorchCommand}"
-                        Text="Flash"
-                        IsVisible="{Binding IsScanning}"
                         BackgroundColor="Transparent"
                         TextColor="White"
                         BorderColor="White"
@@ -87,86 +61,58 @@
             </Grid>
         </Border>
 
-        <Grid Grid.Row="2"
-              RowDefinitions="Auto,Auto,Auto"
-              RowSpacing="12">
-            <!--  Entry para Búsqueda  -->
+        <!--  Search y Manual Entry  -->
+        <Grid Grid.Row="2" RowDefinitions="Auto,Auto">
             <Entry Grid.Row="0"
                    Placeholder="Buscar por nómina"
                    Text="{Binding SearchText}"
-                   TextChanged="OnSearchTextChanged"
                    Keyboard="Numeric" />
-            <!--  Entry y Botón para Escaneo Manual  -->
             <Grid Grid.Row="1" ColumnDefinitions="*,Auto">
                 <Entry x:Name="ManualEntry"
                        Placeholder="Ingresar código manualmente"
+                       Text="{Binding ManualEntryText, Mode=TwoWay}"
                        Keyboard="Numeric" />
                 <Button Grid.Column="1"
-                        HorizontalOptions="End"
-                        FontFamily="AmsiProRegular"
                         Text="Agregar"
-                        Clicked="OnAgregarManualClicked" />
+                        Command="{Binding AddManualCommand}"
+                        HorizontalOptions="End" />
             </Grid>
         </Grid>
 
-        <!--  Lista inferior con scroll (nunca tapa la cámara)  -->
+        <!--  Lista Pasajeros  -->
         <ScrollView Grid.Row="3">
-            <Grid Padding="0,5"
-                  RowDefinitions="*,Auto"
-                  RowSpacing="12">
-                <CollectionView x:Name="PasajerosCollectionView"
-                                ItemsSource="{Binding Pasajeros}"
-                                HeightRequest="180"
-                                BackgroundColor="Transparent">
-                    <CollectionView.ItemsLayout>
-                        <LinearItemsLayout Orientation="Vertical" ItemSpacing="8" />
-                    </CollectionView.ItemsLayout>
+            <Grid RowDefinitions="*,Auto" RowSpacing="12">
+                <CollectionView ItemsSource="{Binding Pasajeros}" HeightRequest="180">
                     <CollectionView.ItemTemplate>
                         <DataTemplate>
                             <Border Margin="4,0"
                                     Padding="12,8"
                                     BackgroundColor="White"
                                     Stroke="#E0E0E0"
-                                    StrokeShape="RoundRectangle 12"
-                                    StrokeThickness="1">
+                                    StrokeShape="RoundRectangle 12">
                                 <Grid ColumnDefinitions="Auto,*">
-                                    <Image Aspect="AspectFit"
-                                           HeightRequest="32"
-                                           Source="person_icon.png"
+                                    <Image Source="person_icon.png"
                                            WidthRequest="32"
+                                           HeightRequest="32"
+                                           Aspect="AspectFit"
                                            VerticalOptions="Center" />
                                     <Label Grid.Column="1"
                                            Margin="12,0,0,0"
+                                           Text="{Binding CveNomina, Converter={StaticResource AnonymizeConverter}}"
                                            FontAttributes="Bold"
-                                           FontAutoScalingEnabled="True"
-                                           FontFamily="AmsiProRegular"
                                            FontSize="Medium"
-                                           Text="{Binding FlePer_CveNomina, Converter={StaticResource AnonymizeConverter}}"
                                            TextColor="#1A1A1A"
                                            VerticalOptions="Center" />
                                 </Grid>
                             </Border>
                         </DataTemplate>
                     </CollectionView.ItemTemplate>
-                    <CollectionView.EmptyView>
-                        <StackLayout Padding="20" HorizontalOptions="Center">
-                            <Label Text="Aún no hay pasajeros escaneados"
-                                   FontSize="Small"
-                                   TextColor="Gray"
-                                   HorizontalTextAlignment="Center" />
-                        </StackLayout>
-                    </CollectionView.EmptyView>
                 </CollectionView>
-
-                <!--  IsEnabled="{Binding HasPasajeros}"  -->
-                <Button x:Name="btnFinalizarViaje"
-                        Grid.Row="4"
+                <Button Grid.Row="1"
+                        Text="Finalizar Viaje"
                         Command="{Binding FinalizarViajeCommand}"
-                        FontAutoScalingEnabled="True"
-                        FontFamily="AmsiProRegular"
                         IsEnabled="{Binding Pasajeros.Count, Converter={StaticResource IntToBoolConverter}}"
-                        Style="{StaticResource DangerButtonStyle}"
-                        Text="Finalizar Viaje" />
+                        Style="{StaticResource DangerButtonStyle}" />
             </Grid>
         </ScrollView>
     </Grid>
