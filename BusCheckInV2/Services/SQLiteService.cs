@@ -3,6 +3,7 @@ using BusCheckInV2.Models;
 using CommunityToolkit.Maui.Alerts;
 using CommunityToolkit.Maui.Core;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using SQLite;
 using System;
 using System.Collections.Generic;
@@ -17,7 +18,7 @@ namespace BusCheckInV2.Services
     public class SQLiteService : ISQLiteService
     {
         private SQLiteAsyncConnection _database;
-        private readonly ILogger<ApiFleteServiceReal> _logger;
+        private readonly ILogger<SQLiteService> _logger;
         // Constantes para configuración (best practice de Microsoft Learn)
         private const string DatabaseFilename = "BusCheckInV2.db3";
         private const SQLiteOpenFlags Flags =
@@ -27,7 +28,18 @@ namespace BusCheckInV2.Services
 
         private string DatabasePath => Path.Combine(FileSystem.AppDataDirectory, DatabaseFilename);
 
-        public SQLiteService() { } // Constructor vacío; inicialización lazy en InitializeAsync
+        // ─── CAMBIO 2: Constructor con logger opcional ────────────────────────
+        // El parámetro es opcional (default null) para mantener compatibilidad
+        // con cualquier lugar que construya SQLiteService directamente.
+        // Cuando se resuelve desde DI, el contenedor inyecta ILogger<SQLiteService>
+        // automáticamente porque AddLogging() ya registra loggers genéricos.
+        // NullLogger.Instance es un logger que no hace nada — nunca lanza excepciones.
+        public SQLiteService(ILogger<SQLiteService> logger = null)
+        {
+            // Si DI no inyecta logger (o si se construye manualmente), usamos NullLogger
+            // NullLogger.Instance implementa ILogger y sus métodos son no-ops seguros
+            _logger = logger ?? NullLogger<SQLiteService>.Instance;
+        }
 
         public async Task InitializeAsync()
         {
@@ -39,9 +51,16 @@ namespace BusCheckInV2.Services
                 await CreateTablesAsync();
                 await _database.EnableWriteAheadLoggingAsync(); // Habilita WAL para concurrency (recomendado en .NET 9+)
                 await SeedDataAsync();
+
+                // ─── NUEVO: Ahora sí podemos loggear correctamente ─────────
+                _logger.LogInformation("SQLiteService inicializado en: {Path}", DatabasePath);
+                // ────────────────────────────────────────────────────────────
             }
             catch (Exception ex)
             {
+                // ─── CAMBIO: Log antes del toast para que quede en Debug Output
+                _logger.LogCritical(ex, "Fallo crítico al inicializar SQLiteService");
+                // ────────────────────────────────────────────────────────────
                 var toast = Toast.Make($"Error al inicializar la base de datos: {ex.Message}", ToastDuration.Long);
                 await toast.Show();
             }

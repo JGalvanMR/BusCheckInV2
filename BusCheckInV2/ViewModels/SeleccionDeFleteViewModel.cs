@@ -13,7 +13,7 @@ using BusCheckInV2.Views;
 
 namespace BusCheckInV2.ViewModels
 {
-    public partial class SeleccionDeFleteViewModel : BaseViewModel
+    public partial class SeleccionDeFleteViewModel : ObservableObject
     {
         private readonly ISQLiteService _databaseService;
         private readonly IAppUpdateService _appUpdateService;
@@ -110,8 +110,61 @@ namespace BusCheckInV2.ViewModels
             }
         }
 
+        // BusCheckInV2/ViewModels/SeleccionDeFleteViewModel.cs
         [RelayCommand]
         private async Task ContinuarAsync()
+        {
+            IsContinuarEnabled = false;
+            try
+            {
+                // Validación sin cambios
+                if (string.IsNullOrEmpty(NombreChofer) ||
+                    SelectedProveedor == null ||
+                    SelectedRuta == null ||
+                    SelectedTipoFlete == null ||
+                    SelectedTipoViaje == null)
+                {
+                    await Application.Current.MainPage.DisplayAlert(
+                        "Error", "Todos los campos deben ser completados.", "OK");
+                    return;
+                }
+
+                var fletePersonal = new Tb_FlePer_FletePersonal
+                {
+                    Fecha = DateTime.Now,
+                    Hora = DateTime.Now.TimeOfDay,
+                    ProvClave = SelectedProveedor.ProvClave,
+                    IdDestFlete = SelectedRuta.IdDestFlete,
+                    TipoFlete = SelectedTipoFlete,
+                    TipoViaje = SelectedTipoViaje,
+                    Chofer = NombreChofer,
+                    IsSynced = false,
+                };
+
+                // ─── CAMBIO CRÍTICO ───────────────────────────────────────────────
+                // sqlite-net-pcl popula fletePersonal.Id automáticamente después
+                // del InsertAsync porque Id está marcado como [PrimaryKey, AutoIncrement]
+                await _databaseService.InsertAsync(fletePersonal);
+
+                // fletePersonal.Id ahora tiene el valor asignado por SQLite (ej: 7)
+                // Lo pasamos como query parameter a EscaneoCodigo
+                var fleteLocalId = fletePersonal.Id;
+
+                await Application.Current.MainPage.DisplayAlert(
+                    "Éxito", "Datos guardados correctamente.", "OK");
+
+                // Navegamos con el ID como parámetro en la URL de Shell
+                // Shell deserializará "fleteLocalId=7" y lo entregará al ViewModel
+                await Shell.Current.GoToAsync(
+                    $"{nameof(EscaneoCodigo)}?fleteLocalId={fleteLocalId}");
+                // ─────────────────────────────────────────────────────────────────
+            }
+            finally
+            {
+                IsContinuarEnabled = true;
+            }
+        }
+        private async Task ContinuarAsyncLEGACY()
         {
             IsContinuarEnabled = false;
             //IsBusy = true;
