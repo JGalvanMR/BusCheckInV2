@@ -40,7 +40,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<IAudioService, AudioService>();
 
         // HttpClient con Polly
-        builder.Services.AddHttpClient<IApiFleteService, ApiFleteServiceReal>(client =>
+        builder.Services.AddHttpClient<IApiFleteService, ApiFleteService>(client =>
         {
             client.BaseAddress = new Uri(GetApiBaseUrl());
             client.Timeout = TimeSpan.FromSeconds(15);

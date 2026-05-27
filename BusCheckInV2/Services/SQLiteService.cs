@@ -19,6 +19,8 @@ namespace BusCheckInV2.Services
     {
         private SQLiteAsyncConnection _database;
         private readonly ILogger<SQLiteService> _logger;
+        private readonly SemaphoreSlim _initLock = new SemaphoreSlim(1, 1);
+        private bool _initialized;
         // Constantes para configuración (best practice de Microsoft Learn)
         private const string DatabaseFilename = "BusCheckInV2.db3";
         private const SQLiteOpenFlags Flags =
@@ -42,6 +44,29 @@ namespace BusCheckInV2.Services
         }
 
         public async Task InitializeAsync()
+        {
+            if (_initialized) return; // fast path sin lock
+
+            await _initLock.WaitAsync();
+            try
+            {
+                if (_initialized) return; // double-check dentro del lock
+
+                _database = new SQLiteAsyncConnection(DatabasePath, Flags);
+                await CreateTablesAsync();
+                await _database.EnableWriteAheadLoggingAsync();
+                await SeedDataAsync();
+                _initialized = true;
+
+                _logger.LogInformation("SQLiteService inicializado en: {Path}", DatabasePath);
+            }
+            finally
+            {
+                _initLock.Release();
+            }
+        }
+
+        public async Task InitializeAsyncLEGACY()
         {
             try
             {

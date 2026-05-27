@@ -13,16 +13,16 @@ namespace BusCheckInV2.Services
     /// <summary>
     /// Implementación real del servicio de API para comunicación con el servidor
     /// </summary>
-    public class ApiFleteServiceReal : IApiFleteService
+    public class ApiFleteService : IApiFleteService
     {
         private readonly HttpClient _httpClient;
-        private readonly ILogger<ApiFleteServiceReal> _logger;
+        private readonly ILogger<ApiFleteService> _logger;
         private readonly ISQLiteService _sqliteService;
         private readonly JsonSerializerOptions _jsonOptions;
 
-        public ApiFleteServiceReal(
+        public ApiFleteService(
             HttpClient httpClient,
-            ILogger<ApiFleteServiceReal> logger,
+            ILogger<ApiFleteService> logger,
             ISQLiteService sqliteService)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));

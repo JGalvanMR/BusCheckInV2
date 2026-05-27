@@ -13,12 +13,13 @@ using System.Threading.Tasks;
 
 namespace BusCheckInV2.ViewModels
 {
-    public partial class FletesPendientesViewModel : ObservableObject
+    public partial class FletesPendientesViewModel : ObservableObject, IDisposable
     {
         private readonly ISQLiteService _databaseService;
         private readonly IApiFleteService _apiService;
         private readonly IAlertService _alertService;
         private readonly INavigationService _navigationService;
+        private bool _disposed;
 
         // ─── PROPIEDADES SIN CAMBIOS ──────────────────────────────────────
 
@@ -350,6 +351,12 @@ namespace BusCheckInV2.ViewModels
         [RelayCommand]
         private async Task VolverAsync() => await _navigationService.GoBackAsync();
 
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _disposed = true;
+            Connectivity.ConnectivityChanged -= OnConnectivityChanged;
+        }
         //public override void Dispose()
         //{
         //    Connectivity.ConnectivityChanged -= OnConnectivityChanged;

@@ -22,6 +22,7 @@ namespace BusCheckInV2.ViewModels
         private readonly IConnectivity _connectivity;
         private bool _permisosVerificados = false;
 
+
         #region PROPIEDADES BINDABLES
         public ObservableCollection<Tb_Cat_Proveedor> Proveedores { get; set; }
         [ObservableProperty]
@@ -66,6 +67,8 @@ namespace BusCheckInV2.ViewModels
         {
             _databaseService = databaseService ?? throw new ArgumentNullException(nameof(databaseService));
             _appUpdateService = appUpdateService ?? throw new ArgumentNullException(nameof(appUpdateService));
+
+            _appUpdateService = Microsoft.Maui.Controls.Application.Current.Handler.MauiContext.Services.GetService<IAppUpdateService>();
 
             Proveedores = new ObservableCollection<Tb_Cat_Proveedor>();
             Rutas = new ObservableCollection<Tb_FlePer_Ruta>();

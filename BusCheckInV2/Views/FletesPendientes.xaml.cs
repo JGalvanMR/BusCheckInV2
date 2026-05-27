@@ -30,6 +30,13 @@ namespace BusCheckInV2.Views
             }
         }
 
+        protected override void OnDisappearing()
+        {
+            base.OnDisappearing();
+            if (BindingContext is IDisposable disposable)
+                disposable.Dispose();
+        }
+
         //protected override void OnDisappearing()
         //{
         //    base.OnDisappearing();
