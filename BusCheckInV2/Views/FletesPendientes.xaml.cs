@@ -1,13 +1,9 @@
-// BusCheckInV2/Views/FletesPendientes.xaml.cs
-
 using BusCheckInV2.ViewModels;
-using Microsoft.Maui.Controls;
 
 namespace BusCheckInV2.Views
 {
     public partial class FletesPendientes : ContentPage
     {
-        // El ViewModel se inyecta desde DI igual que en SeleccionDeFlete
         public FletesPendientes(FletesPendientesViewModel viewModel)
         {
             InitializeComponent();
@@ -20,25 +16,28 @@ namespace BusCheckInV2.Views
 
             if (BindingContext is FletesPendientesViewModel viewModel)
             {
-                // Solo cargamos los choferes si la lista está vacía.
-                // Evita recargar innecesariamente si el usuario navega
-                // hacia atrás y regresa a esta pantalla.
-                if (!viewModel.ListaUsuarios.Any())
+                // RECUPERADO DE LA VIEJA: Si ya hay un chofer seleccionado (ej. el usuario volvió de escanear),
+                // forzamos la recarga de la lista para ver los cambios actualizados.
+                if (!string.IsNullOrEmpty(viewModel.ChoferSeleccionado) && viewModel.FletesPendientes.Any())
+                {
+                    await viewModel.CargarFletesPendientesCommand.ExecuteAsync(null);
+                }
+                // Si la lista está vacía (primera vez), carga los choferes
+                else if (!viewModel.ListaUsuarios.Any())
                 {
                     await viewModel.CargarChoferesCommand.ExecuteAsync(null);
                 }
             }
         }
 
-        //protected override void OnDisappearing()
-        //{
-        //    base.OnDisappearing();
-        //    // Al salir de la pantalla liberamos el ViewModel
-        //    // para cancelar suscripciones a Connectivity
-        //    if (BindingContext is FletesPendientesViewModel viewModel)
-        //    {
-        //        viewModel.Dispose();
-        //    }
-        //}
+        protected override void OnDisappearing()
+        {
+            base.OnDisappearing();
+            // MANTENIDO DE LA NUEVA: Prevenir Memory Leaks
+            if (BindingContext is FletesPendientesViewModel viewModel)
+            {
+                viewModel.Dispose();
+            }
+        }
     }
 }
