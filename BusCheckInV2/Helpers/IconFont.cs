@@ -15,10 +15,10 @@ namespace BusCheckInV2.Helpers
         public const string Sync = "\uf021";
         public const string Info = "\uf05a";
         public const string Logout = "\uf2f5";
-        public const string Error = "Error";
-        public const string Success = "Success";
-        public const string Warning = "Warning";
-        public const string InfoCircle = "InfoCircle";
+        public const string Error = "\uf057";         
+        public const string Success = "\uf058";       
+        public const string Warning = "\uf071";       
+        public const string InfoCircle = "\uf05a";    
         public const string Search = "\uf002"; 
         public const string Add = "\uf067";
         public const string Edit = "\uf044";
