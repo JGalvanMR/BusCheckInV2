@@ -2,6 +2,7 @@
 using BusCheckInV2.Constants;
 using BusCheckInV2.Platforms.Android.Services;
 using BusCheckInV2.Services;
+using BusCheckInV2.Services.Sync;
 using BusCheckInV2.ViewModels;
 using BusCheckInV2.Views;
 using CommunityToolkit.Maui;
@@ -53,6 +54,8 @@ public static class MauiProgram
         builder.Services.AddSingleton<ISQLiteService, SQLiteService>();
         builder.Services.AddSingleton<IVersionService, VersionServiceAndroid>();
         builder.Services.AddSingleton<IAppUpdateService, AppUpdateService>();
+        builder.Services.AddSingleton<ISyncService, SyncService>();
+        builder.Services.AddHostedService<SyncBackgroundService>();
 
         // ViewModels
         builder.Services.AddTransient<SeleccionDeFleteViewModel>();
