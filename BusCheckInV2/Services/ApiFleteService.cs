@@ -278,6 +278,44 @@ namespace BusCheckInV2.Services
             return response?.Success == true && response.Data?.Contains("Actualizado") == true;
         }
 
+        public async Task<DetFletesBatchSyncResult> SincronizarDetFletesAsync(
+    int serverIdFletePer,
+    List<DetFleteItemRequest> items)
+        {
+            var url = GetApiUrl("/SincronizarDetFletes");
+
+            var payload = new
+            {
+                IdFletePer = serverIdFletePer,
+                Items = items.Select(i => new
+                {
+                    i.FlePer_CveNomina,
+                    i.FlePer_Latitud,
+                    i.FlePer_Longitud,
+                    i.FlePer_Fecha,
+                    i.LocalId
+                }).ToList()
+            };
+
+            var content = new StringContent(
+                JsonSerializer.Serialize(payload, _jsonOptions),
+                System.Text.Encoding.UTF8,
+                "application/json");
+
+            var response = await ExecuteApiCallAsync<ApiResponse<DetFletesBatchSyncResult>>(
+                () => _httpClient.PostAsync(url, content),
+                "SincronizarDetFletes");
+
+            if (response?.Success == true && response.Data != null)
+                return response.Data;
+
+            return new DetFletesBatchSyncResult
+            {
+                Success = false,
+                Message = "Error al sincronizar batch de detalles"
+            };
+        }
+
         public async Task<string> HelloWorld()
         {
             var url = GetApiUrl("/HelloWorld");

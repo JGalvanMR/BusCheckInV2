@@ -32,19 +32,20 @@ namespace BusCheckInV2.ViewModels
         private ObservableCollection<Tb_FlePer_DetFlete> _allPasajeros = new();
 
         [ObservableProperty]
-        private string _totalPasajerosText = "Total: 0";
+        private string _totalPasajerosText = "Pasajeros: 0";
 
         [ObservableProperty]
         private string _textoBotonEscaneo = "Escanear";
 
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(CanScan))]
         private bool _isSyncing;
 
         [ObservableProperty]
         private bool _isFinalizarEnabled = true;
 
         [ObservableProperty]
-        private string _syncStatus = "Sincronizado";
+        private string _syncStatus = "Pendiente";
 
         [ObservableProperty]
         private string _searchText = string.Empty;
@@ -63,21 +64,25 @@ namespace BusCheckInV2.ViewModels
 
         [ObservableProperty]
         private string _manualEntryText = string.Empty;
+        public bool CanScan => !IsSyncing;
 
         private int? _folioFlete;
-        private int _fleteLocalId = 0;
         /// <summary>
         /// Cache del IdFletePer del servidor. Se popula después de que
         /// SincronizarFletePadreAsync termina exitosamente.
         /// Volatile garantiza visibilidad entre threads (background sync + UI).
         /// </summary>
-        private long _serverIdFletePer = 0;
         private readonly string _patronNumeros = @"^[0-9]+$";
         private const int SyncIntervalSeconds = 15;
-
-        public bool CanScan => !IsSyncing;
         public bool HasPendingSyncOperations => !_pendingOperations.IsEmpty || Pasajeros.Any(p => !p.IsSynced);
-        private bool _isSyncInProgress = false;
+
+        #region Estado Interno
+        private int _fleteLocalId;
+        private long _serverIdFletePer;
+        private bool _isSyncInProgress;
+        private bool _initialized;
+        private bool _inicioRegistrado;
+        #endregion
 
         // ─── NUEVO MÉTODO: Recibe parámetros de navegación Shell ──────────────
         // MAUI llama a este método automáticamente ANTES de que la página
@@ -413,6 +418,7 @@ namespace BusCheckInV2.ViewModels
 
             if (serverIdFletePer > 0)
             {
+                var sw = System.Diagnostics.Stopwatch.StartNew();
                 // Actualizamos el registro local con el ID que nos asignó el servidor
                 // y marcamos como sincronizado
                 fleteLocal.IdFletePer = serverIdFletePer;
@@ -426,12 +432,25 @@ namespace BusCheckInV2.ViewModels
                 // CRÍTICO: Actualizar todos los DetFlete de este flete que tienen
                 // el ID local como referencia, para que apunten al ID real del servidor
                 await ActualizarIdFleteEnDetallesAsync(_fleteLocalId, serverIdFletePer);
+                sw.Stop();
+
+                await _databaseService.RegistrarSyncLogAsync(
+                    tipoOperacion: "FLETE_PADRE",
+    idFletePer: serverIdFletePer > 0 ? serverIdFletePer : _fleteLocalId,
+    exitoso: serverIdFletePer > 0,
+    mensaje: serverIdFletePer > 0
+                             ? $"Insertado con Id={serverIdFletePer}"
+                             : "API rechazó el flete",
+    registrosAfectados: 1,
+    duracionMs: (int)sw.ElapsedMilliseconds);
             }
             else
             {
                 Console.WriteLine($"[Sync] API rechazó el flete padre. Respuesta={serverIdFletePer}");
                 throw new Exception("El servidor no pudo insertar el flete padre.");
             }
+
+
         }
 
         // ─── Actualiza el IdFletePer en los detalles del servidor ID recibido ─────────
@@ -456,7 +475,7 @@ namespace BusCheckInV2.ViewModels
         }
 
         // ─── FASE 2: Sincronizar los detalles (pasajeros escaneados) ─────────────────
-        private async Task SincronizarDetallesAsync()
+        private async Task SincronizarDetallesAsyncOG()
         {
             if (_fleteLocalId == 0) return;
 
@@ -527,6 +546,91 @@ namespace BusCheckInV2.ViewModels
                 SyncStatus = $"Pendiente ({fallidos} sin sync)";
             else
                 SyncStatus = "Sincronizado";
+        }
+
+        private async Task SincronizarDetallesAsync()
+        {
+            if (_fleteLocalId == 0) return;
+
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            // El flete padre debe tener ID del servidor
+            var fleteLocal = await _databaseService
+                .GetItemAsync<Tb_FlePer_FletePersonal>(_fleteLocalId);
+
+            if (fleteLocal?.IdFletePer is not > 0)
+            {
+                Console.WriteLine("[Sync] No se sincronizan detalles: padre sin IdFletePer");
+                return;
+            }
+
+            long serverIdFletePer = fleteLocal.IdFletePer!.Value;
+
+            // Obtener todos los detalles pendientes de este flete
+            var todosDetalles = await _databaseService
+                .GetItemsAsync<Tb_FlePer_DetFlete>();
+
+            var pendientes = todosDetalles
+                .Where(d => d.IdFletePer == serverIdFletePer && !d.IsSynced)
+                .ToList();
+
+            if (pendientes.Count == 0)
+            {
+                Console.WriteLine("[Sync] No hay detalles pendientes");
+                return;
+            }
+
+            Console.WriteLine(
+                $"[Sync] Enviando batch de {pendientes.Count} detalles para flete {serverIdFletePer}");
+            // ── NUEVO: Un solo POST con todos los pasajeros ────────────────────────
+            var items = pendientes.Select(d => new DetFleteItemRequest
+            {
+                FlePer_CveNomina = d.CveNomina ?? 0,
+                FlePer_Latitud = d.Latitud ?? 0,
+                FlePer_Longitud = d.Longitud ?? 0,
+                FlePer_Fecha = d.Fecha ?? DateTime.Now,
+                LocalId = d.Id        // Para saber cuáles marcar si hay fallos parciales
+            }).ToList();
+
+            var resultado = await _apiService.SincronizarDetFletesAsync(
+                (int)serverIdFletePer,
+                items);
+
+            if (resultado.Success)
+            {
+                // Marcar como sincronizados todos los que no están en la lista de fallidos
+                foreach (var detalle in pendientes)
+                {
+                    bool fallo = resultado.LocalIdsFallidos.Contains(detalle.Id);
+                    if (!fallo)
+                    {
+                        detalle.IsSynced = true;
+                        await _databaseService.UpdateAsync(detalle);
+                    }
+                }
+
+                int sincronizados = pendientes.Count - resultado.LocalIdsFallidos.Count;
+                Console.WriteLine(
+                    $"[Sync] Batch: {sincronizados} sync, {resultado.LocalIdsFallidos.Count} omitidos");
+
+                SyncStatus = resultado.LocalIdsFallidos.Count > 0
+                    ? $"Pendiente ({resultado.LocalIdsFallidos.Count} sin sync)"
+                    : "Sincronizado";
+
+                await _databaseService.RegistrarSyncLogAsync(
+                    tipoOperacion: "DETALLE_BATCH",
+                    idFletePer: serverIdFletePer,
+                    exitoso: resultado.Success,
+                    mensaje: resultado.Message,
+                    registrosAfectados: resultado.TotalInsertados,
+                    duracionMs: (int)sw.ElapsedMilliseconds);
+
+                sw.Stop();
+            }
+            else
+            {
+                Console.WriteLine($"[Sync] Batch fallido: {resultado.Message}");
+                SyncStatus = "Pendiente (error batch)";
+            }
         }
         #endregion
 

@@ -36,5 +36,21 @@ namespace BusCheckInV2.Services
         Task<List<FletePendienteUI>> ObtenerFletesPendientesDesdeCacheAsync(string chofer, int dias);
         Task<bool> GuardarFleteEnCacheAsync(FleteApi flete);
         Task LimpiarCacheAsync();
+
+
+        /// <summary>Registra una entrada en el log de sincronización.</summary>
+        Task RegistrarSyncLogAsync(
+            string tipoOperacion,
+            long? idFletePer,
+            bool exitoso,
+            string mensaje,
+            int registrosAfectados = 0,
+            int duracionMs = 0);
+
+        /// <summary>Devuelve los últimos N registros del log (para pantalla de diagnóstico).</summary>
+        Task<List<Tb_Sync_Log>> ObtenerSyncLogAsync(int ultimos = 50);
+
+        /// <summary>Limpia entradas de log más antiguas que N días.</summary>
+        Task LimpiarSyncLogAntiguoAsync(int diasRetencion = 7);
     }
 }

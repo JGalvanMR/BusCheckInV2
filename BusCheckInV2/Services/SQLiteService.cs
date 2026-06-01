@@ -99,6 +99,7 @@ namespace BusCheckInV2.Services
             await _database.CreateTableAsync<Tb_FlePer_FletePersonal>();
             await _database.CreateTableAsync<Tb_FlePer_ProvRuta>();
             await _database.CreateTableAsync<Tb_FlePer_Ruta>();
+            await _database.CreateTableAsync<Tb_Sync_Log>();
             // Agrega más tablas si es necesario
         }
 
@@ -688,6 +689,68 @@ namespace BusCheckInV2.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error limpiando caché");
+            }
+        }
+        #endregion
+
+        #region LOG DE SINCRONIZACION
+        public async Task RegistrarSyncLogAsync(
+    string tipoOperacion,
+    long? idFletePer,
+    bool exitoso,
+    string mensaje,
+    int registrosAfectados = 0,
+    int duracionMs = 0)
+        {
+            try
+            {
+                var entry = new Tb_Sync_Log
+                {
+                    Timestamp = DateTime.Now,
+                    TipoOperacion = tipoOperacion,
+                    IdFletePer = idFletePer,
+                    Exitoso = exitoso,
+                    Mensaje = mensaje,
+                    RegistrosAfectados = registrosAfectados,
+                    DuracionMs = duracionMs
+                };
+                await _database.InsertAsync(entry);
+            }
+            catch (Exception ex)
+            {
+                // El log nunca debe interrumpir el flujo principal
+                _logger.LogWarning(ex, "No se pudo escribir sync log");
+            }
+        }
+
+        public async Task<List<Tb_Sync_Log>> ObtenerSyncLogAsync(int ultimos = 50)
+        {
+            try
+            {
+                return await _database.Table<Tb_Sync_Log>()
+                    .OrderByDescending(l => l.Timestamp)
+                    .Take(ultimos)
+                    .ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error leyendo sync log");
+                return new List<Tb_Sync_Log>();
+            }
+        }
+
+        public async Task LimpiarSyncLogAntiguoAsync(int diasRetencion = 7)
+        {
+            try
+            {
+                var limite = DateTime.Now.AddDays(-diasRetencion);
+                await _database.Table<Tb_Sync_Log>()
+                    .Where(l => l.Timestamp < limite)
+                    .DeleteAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error limpiando sync log antiguo");
             }
         }
         #endregion

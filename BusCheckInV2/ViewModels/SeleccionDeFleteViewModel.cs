@@ -84,6 +84,7 @@ namespace BusCheckInV2.ViewModels
             LimpiarControles();
             IsContinuarEnabled = true;
             await LoadProveedoresAsync();
+            await _databaseService.LimpiarSyncLogAntiguoAsync(diasRetencion: 7);
         }
 
         partial void OnSelectedProveedorChanged(Tb_Cat_Proveedor value)

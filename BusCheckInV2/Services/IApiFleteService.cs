@@ -70,6 +70,12 @@ namespace BusCheckInV2.Services
         Task<bool> UpdateFletePersonal(UpdateFleteRequest request);
 
         /// <summary>
+        /// Sincroniza todos los pasajeros escaneados en una sola llamada HTTP.
+        /// Más eficiente y resiliente que InsertarDetFlete uno por uno.
+        /// </summary>
+        Task<DetFletesBatchSyncResult> SincronizarDetFletesAsync(int serverIdFletePer,List<DetFleteItemRequest> items);
+
+        /// <summary>
         /// Endpoint de prueba HelloWorld
         /// </summary>
         Task<string> HelloWorld();
