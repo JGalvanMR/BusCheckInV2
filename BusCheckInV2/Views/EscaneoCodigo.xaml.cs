@@ -5,27 +5,20 @@ using Microsoft.Maui.Controls;
 using System;
 using System.Threading.Tasks;
 using static Android.App.Assist.AssistStructure;
+using BusCheckInV2.Converters;
 
 namespace BusCheckInV2.Views
 {
     public partial class EscaneoCodigo : ContentPage
     {
         private CameraView _cameraView;
-        private readonly EscaneoCodigoViewModel _viewModel;
+        private EscaneoCodigoViewModel? _viewModel;
         private bool _isCameraInitialized = false;
         public EscaneoCodigo(EscaneoCodigoViewModel viewModel)
         {
-            try
-            {
-                InitializeComponent();
-                _viewModel = viewModel;
-                BindingContext = viewModel;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error en constructor: {ex}");
-                throw;
-            }
+            InitializeComponent();
+            _viewModel = viewModel;
+            BindingContext = viewModel;
         }
 
         private void InitializeCamera()
@@ -131,6 +124,8 @@ namespace BusCheckInV2.Views
 
             try
             {
+                if (_viewModel is null) return;
+                AttachBarcodeReader();
                 // Inicializar ViewModel PRIMERO
                 await _viewModel.InitializeAsync();
 
@@ -141,7 +136,7 @@ namespace BusCheckInV2.Views
                 }
 
                 // Activar escaneo después de un breve delay
-                await Task.Delay(500);
+                await Task.Delay(1000);
                 _viewModel.IsScanning = true;
             }
             catch (Exception ex)
@@ -156,6 +151,7 @@ namespace BusCheckInV2.Views
 
             try
             {
+                if (_viewModel is null) return;
                 // Desactivar escaneo PERO NO LIBERAR CÁMARA completamente
                 _viewModel.IsScanning = false;
                 _viewModel.IsTorchOn = false;
@@ -238,6 +234,58 @@ namespace BusCheckInV2.Views
         {
             // Si es necesario, desconecta handlers específicos de UI
             //LiberarCamera();
+            _viewModel?.Dispose();
+            _viewModel = null;
+            BindingContext = null;
+        }
+
+        private void AttachBarcodeReader()
+        {
+            if (_viewModel is null) return;
+
+            // Busca el Grid marcado x:Name="CameraContainer" en el XAML
+            var container = this.FindByName<Grid>("CameraContainer");
+            if (container is null) return;
+
+            // Evita doble-inyección: si ya existe un CameraView no lo agreguemos de nuevo
+            bool cameraYaExiste = container.Children
+                .OfType<CameraView>()
+                .Any();
+
+            if (cameraYaExiste) return;
+
+            // CameraView debe ser el primer hijo para que ocupe todo el espacio
+            var cameraView = new CameraView
+            {
+                HorizontalOptions = LayoutOptions.Fill,
+                VerticalOptions = LayoutOptions.Fill,
+            };
+
+            // Binding: IsDetecting controla si la cámara analiza frames
+            cameraView.SetBinding(CameraView.PauseScanningProperty,
+    new Binding(nameof(_viewModel.IsScanning), converter: new InvertedBoolConverter()));
+
+
+            // Binding: TorchOn para el flash
+            cameraView.SetBinding(CameraView.TorchOnProperty,
+                new Binding(nameof(_viewModel.IsTorchOn)));
+
+            // Evento: cuando se detecta un barcode -> ProcessBarcodeResultsCommand
+            cameraView.OnDetectionFinished += OnCameraDetectionFinished;
+
+            // Insertar al inicio (index 0) para que quede detrás del flash button
+            container.Insert(0, cameraView);
+        }
+
+        private async void OnCameraDetectionFinished(object? sender,
+        OnDetectionFinishedEventArg e)
+        {
+            if (_viewModel is null) return;
+
+            // ProcessBarcodeResultsCommand es un AsyncRelayCommand que ya tiene
+            // guard interno (_isProcessingBarcode) para evitar re-entrancia.
+            if (_viewModel.ProcessBarcodeResultsCommand.CanExecute(e.BarcodeResults))
+                await _viewModel.ProcessBarcodeResultsCommand.ExecuteAsync(e.BarcodeResults);
         }
 
         protected override bool OnBackButtonPressed()

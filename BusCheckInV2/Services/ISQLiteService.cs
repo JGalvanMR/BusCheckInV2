@@ -14,7 +14,8 @@ namespace BusCheckInV2.Services
         Task<int> DeleteAsync<T>(T item) where T : class;
         Task<List<T>> GetItemsAsync<T>() where T : class, new();
         Task<T> GetItemAsync<T>(int id) where T : class, new();
-        Task ClearAllTablesAsync();
+        //Task ClearAllTablesAsync();
+        Task<ClearTablesResult> ClearAllTablesAsync(bool forceDelete = false);
 
         // ✅ CORREGIDO: Añadir 'new()' OBLIGATORIO para sqlite-net-pcl
         Task<int> DeleteByPredicateAsync<T>(Expression<Func<T, bool>> predicate) where T : class, new();

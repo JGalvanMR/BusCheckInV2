@@ -1,4 +1,5 @@
-﻿using BarcodeScanning;
+﻿using Android.Database.Sqlite;
+using BarcodeScanning;
 using BusCheckInV2.Models;
 using BusCheckInV2.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -65,6 +66,12 @@ namespace BusCheckInV2.ViewModels
 
         private int? _folioFlete;
         private int _fleteLocalId = 0;
+        /// <summary>
+        /// Cache del IdFletePer del servidor. Se popula después de que
+        /// SincronizarFletePadreAsync termina exitosamente.
+        /// Volatile garantiza visibilidad entre threads (background sync + UI).
+        /// </summary>
+        private long _serverIdFletePer = 0;
         private readonly string _patronNumeros = @"^[0-9]+$";
         private const int SyncIntervalSeconds = 15;
 
@@ -212,7 +219,6 @@ namespace BusCheckInV2.ViewModels
             }
         }
 
-        // ─── CAMBIO: ProcessBarcodeValueAsync usa _fleteLocalId ───────────────
         private async Task ProcessBarcodeValueAsync(string barcodeValue)
         {
             if (!ValidateBarcode(barcodeValue, out int numeroNomina)) return;
@@ -222,9 +228,18 @@ namespace BusCheckInV2.ViewModels
 
             await _audioService.PlayBeepAsync();
 
+            // ── CORRECCIÓN RACE CONDITION ─────────────────────────────────────────
+            // Si el padre ya fue sincronizado, usamos el ID del servidor directamente.
+            // Si no, usamos el ID local — ActualizarIdFleteEnDetallesAsync lo corregirá
+            // después de que SincronizarFletePadreAsync termine.
+            // Leer _serverIdFletePer en este punto es seguro (volatile field).
+            long idParaDetalle = _serverIdFletePer > 0
+                ? _serverIdFletePer
+                : _fleteLocalId;
+
             var nuevoPasajero = new Tb_FlePer_DetFlete
             {
-                IdFletePer = _fleteLocalId, // ← AHORA TIENE VALOR
+                IdFletePer = idParaDetalle,
                 CveNomina = numeroNomina,
                 Latitud = location.Latitude,
                 Longitud = location.Longitude,
@@ -235,7 +250,6 @@ namespace BusCheckInV2.ViewModels
             Pasajeros.Add(nuevoPasajero);
             AllPasajeros.Add(nuevoPasajero);
             await UpdateTotalPasajerosAsync();
-
             await _databaseService.InsertAsync(nuevoPasajero);
 
             if (IsConnected)
@@ -405,6 +419,8 @@ namespace BusCheckInV2.ViewModels
                 fleteLocal.IsSynced = true;
                 await _databaseService.UpdateAsync(fleteLocal);
 
+                _serverIdFletePer = serverIdFletePer;
+
                 Console.WriteLine($"[Sync] Flete padre sincronizado. IdFletePer servidor={serverIdFletePer}");
 
                 // CRÍTICO: Actualizar todos los DetFlete de este flete que tienen
@@ -565,19 +581,88 @@ namespace BusCheckInV2.ViewModels
         {
             Task.Run(async () =>
             {
+                Console.WriteLine($"[SyncService] Iniciado para flete local {_fleteLocalId}");
+
                 while (!_cancellationTokenSource.Token.IsCancellationRequested)
                 {
                     try
                     {
                         if (HasPendingSyncOperations && IsConnected)
+                        {
+                            Console.WriteLine("[SyncService] Operaciones pendientes detectadas, sincronizando...");
                             await TrySyncDataAsync();
+                        }
 
-                        await Task.Delay(TimeSpan.FromSeconds(SyncIntervalSeconds), _cancellationTokenSource.Token);
+                        await Task.Delay(
+                            TimeSpan.FromSeconds(SyncIntervalSeconds),
+                            _cancellationTokenSource.Token);
                     }
-                    catch (TaskCanceledException) { break; }
-                    catch { /* Ignorar */ }
+                    catch (TaskCanceledException)
+                    {
+                        // Cancelación limpia: el ViewModel fue dispuesto. Salir del loop.
+                        Console.WriteLine("[SyncService] Cancelado limpiamente.");
+                        break;
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // Igual que TaskCanceledException en contexto de Task.Delay
+                        Console.WriteLine("[SyncService] OperationCanceled, saliendo.");
+                        break;
+                    }
+                    catch (SQLiteException sqlEx)
+                    {
+                        // Error de SQLite: loggear con detalle y continuar el loop.
+                        // No queremos detener el sync por un error de BD recuperable.
+                        Console.WriteLine(
+                            $"[SyncService] SQLite Error ({sqlEx.HResult}): {sqlEx.Message}");
+
+                        // Espera extra antes de reintentar para no martillar la BD
+                        await SafeDelayAsync(TimeSpan.FromSeconds(30));
+                    }
+                    catch (HttpRequestException httpEx)
+                    {
+                        // Error de red: esperado en modo offline. No es crítico.
+                        Console.WriteLine(
+                            $"[SyncService] Red no disponible: {httpEx.Message}");
+
+                        await SafeDelayAsync(TimeSpan.FromSeconds(SyncIntervalSeconds));
+                    }
+                    catch (Exception ex)
+                    {
+                        // Cualquier otro error: loggear completo para debugging.
+                        // Nunca silenciar — esto es información de producción.
+                        Console.WriteLine(
+                            $"[SyncService] Error inesperado: {ex.GetType().Name}: {ex.Message}");
+                        Console.WriteLine(
+                            $"[SyncService] StackTrace: {ex.StackTrace}");
+
+                        // Actualizar UI para que el operador sepa que algo falló
+                        await MainThread.InvokeOnMainThreadAsync(() =>
+                        {
+                            SyncStatus = "Error en sincronización automática";
+                        });
+
+                        // Espera más larga antes de reintentar para evitar error storm
+                        await SafeDelayAsync(TimeSpan.FromSeconds(60));
+                    }
                 }
+
+                Console.WriteLine($"[SyncService] Detenido para flete local {_fleteLocalId}");
+
             }, _cancellationTokenSource.Token);
+        }
+
+        /// <summary>
+        /// Task.Delay que no lanza si el token ya está cancelado.
+        /// Útil en los catch blocks donde ya capturamos la excepción principal.
+        /// </summary>
+        private async Task SafeDelayAsync(TimeSpan delay)
+        {
+            try
+            {
+                await Task.Delay(delay, _cancellationTokenSource.Token);
+            }
+            catch (OperationCanceledException) { /* Intencional */ }
         }
 
         private async Task TrySyncDataAsyncLEGACY()

@@ -68,15 +68,12 @@ namespace BusCheckInV2.ViewModels
             _databaseService = databaseService ?? throw new ArgumentNullException(nameof(databaseService));
             _appUpdateService = appUpdateService ?? throw new ArgumentNullException(nameof(appUpdateService));
 
-            _appUpdateService = Microsoft.Maui.Controls.Application.Current.Handler.MauiContext.Services.GetService<IAppUpdateService>();
-
+            // Colecciones observables — inicializadas aquí, no en InitializeAsync,
+            // para que el binding del XAML funcione desde el primer render.
             Proveedores = new ObservableCollection<Tb_Cat_Proveedor>();
             Rutas = new ObservableCollection<Tb_FlePer_Ruta>();
             TipoFleteOptions = new List<string> { "NORMAL", "MIXTO", "T.E.", "EXTRAORDINARIO" };
             TipoViajeOptions = new List<string> { "TRAER GENTE", "LLEVAR GENTE" };
-
-            // Resuelve el servicio (ajusta si usas DI completo)
-            _appUpdateService = Microsoft.Maui.Controls.Application.Current.Handler.MauiContext.Services.GetService<IAppUpdateService>();
         }
 
         public async Task InitializeAsync()

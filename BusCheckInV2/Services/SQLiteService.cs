@@ -1,5 +1,4 @@
-﻿using Android.Widget;
-using BusCheckInV2.Models;
+﻿using BusCheckInV2.Models;
 using CommunityToolkit.Maui.Alerts;
 using CommunityToolkit.Maui.Core;
 using Microsoft.Extensions.Logging;
@@ -12,6 +11,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
 using Toast = CommunityToolkit.Maui.Alerts.Toast;
+using System.Threading;
 
 namespace BusCheckInV2.Services
 {
@@ -202,24 +202,64 @@ namespace BusCheckInV2.Services
         }
 
         // Método para limpiar todas las tablas
-        public async Task ClearAllTablesAsync()
+        // ============================================================
+        //  ARCHIVO: BusCheckInV2/Services/SQLiteService.cs
+        //  INSTRUCCIÓN: Reemplaza el método ClearAllTablesAsync completo.
+        // ============================================================
+
+        public async Task<ClearTablesResult> ClearAllTablesAsync(bool forceDelete = false)
         {
             try
             {
+                // ── GUARDIA: verificar pendientes antes de borrar ──────────────────
+                // Esta verificación es la diferencia entre perder datos de producción
+                // y mantenerlos seguros. NUNCA se omite sin forceDelete explícito.
+                if (!forceDelete)
+                {
+                    var pendientesFletes = await _database
+                        .Table<Tb_FlePer_FletePersonal>()
+                        .Where(f => !f.IsSynced)
+                        .CountAsync();
+
+                    var pendientesDetalles = await _database
+                        .Table<Tb_FlePer_DetFlete>()
+                        .Where(d => !d.IsSynced)
+                        .CountAsync();
+
+                    int totalPendientes = pendientesFletes + pendientesDetalles;
+
+                    if (totalPendientes > 0)
+                    {
+                        _logger.LogWarning(
+                            "ClearAllTablesAsync bloqueado: {Total} registros sin sync " +
+                            "({Fletes} fletes, {Detalles} detalles)",
+                            totalPendientes, pendientesFletes, pendientesDetalles);
+
+                        return ClearTablesResult.Rejected(totalPendientes);
+                    }
+                }
+
+                // ── Conteo para el reporte ─────────────────────────────────────────
+                int countFletes = await _database.Table<Tb_FlePer_FletePersonal>().CountAsync();
+                int countDetalles = await _database.Table<Tb_FlePer_DetFlete>().CountAsync();
+
+                // ── Borrado en orden correcto (detalles antes que padres) ──────────
                 await _database.DeleteAllAsync<Tb_FlePer_DetFlete>();
                 await _database.DeleteAllAsync<Tb_FlePer_FletePersonal>();
-                // Descomenta si necesitas limpiar estas (estaban comentadas en tu código)
-                // await _database.DeleteAllAsync<Tb_Cat_Proveedor>();
-                // await _database.DeleteAllAsync<Tb_FlePer_ProvRuta>();
-                // await _database.DeleteAllAsync<Tb_FlePer_Ruta>();
 
-                var toast = Toast.Make("Todas las tablas se han limpiado correctamente.", ToastDuration.Short);
-                await toast.Show();
+                int totalBorrados = countFletes + countDetalles;
+
+                _logger.LogWarning(
+                    "ClearAllTablesAsync ejecutado. Borrados: {Fletes} fletes, " +
+                    "{Detalles} detalles. ForceDelete={Force}",
+                    countFletes, countDetalles, forceDelete);
+
+                return ClearTablesResult.Ok(totalBorrados);
             }
             catch (Exception ex)
             {
-                var toast = Toast.Make($"Error al limpiar las tablas: {ex.Message}", ToastDuration.Long);
-                await toast.Show();
+                _logger.LogError(ex, "Error en ClearAllTablesAsync");
+                return ClearTablesResult.Error($"Error al limpiar tablas: {ex.Message}");
             }
         }
 
