@@ -2,9 +2,9 @@
 using BusCheckInV2.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using IntelliJ.Lang.Annotations;
 using Microsoft.Maui.ApplicationModel;
 using Microsoft.Maui.Controls;
+using Microsoft.Maui.Networking;
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -18,8 +18,13 @@ namespace BusCheckInV2.ViewModels
         private readonly ISQLiteService _databaseService;
         private readonly IAppUpdateService _appUpdateService;
 
-        private readonly IApiFleteService _apiFleteService;
-        private readonly IConnectivity _connectivity;
+        // FIX (2026-06-01): se eliminan los campos _apiFleteService e _connectivity.
+        // Estaban declarados pero nunca se inyectaban en el constructor ni se
+        // usaban en ningún método. Eran refactor incompleto de una versión
+        // anterior que consultaba online; el flujo actual es 100% offline-first
+        // hacia SQLite para el catálogo (proveedores/rutas) y solo sincroniza
+        // el flete una vez creado. El connectivity del sistema se sigue
+        // consultando vía la clase estática Microsoft.Maui.Networking.Connectivity.
         private bool _permisosVerificados = false;
 
 
@@ -150,6 +155,17 @@ namespace BusCheckInV2.ViewModels
                 // fletePersonal.Id ahora tiene el valor asignado por SQLite (ej: 7)
                 // Lo pasamos como query parameter a EscaneoCodigo
                 var fleteLocalId = fletePersonal.Id;
+
+                // FIX 2026-06-02: guardar el flete activo en Preferences para
+                // implementar "continuar con el último flete" en próximas
+                // sesiones. Si el chofer cierra la app a medio viaje, al
+                // reabrir la pantalla principal verá un diálogo ofreciendo
+                // retomar este flete. Se limpia en EscaneoCodigoViewModel
+                // cuando se finaliza o cancela el viaje.
+                Preferences.Set("ultimo_flete_local_id", fleteLocalId);
+                Preferences.Set("ultimo_flete_chofer", NombreChofer ?? "");
+                Preferences.Set("ultimo_flete_ruta", SelectedRuta?.NomDestFlete ?? "");
+                Preferences.Set("ultimo_flete_fecha", DateTime.Now.ToString("o"));
 
                 await Application.Current.MainPage.DisplayAlert(
                     "Éxito", "Datos guardados correctamente.", "OK");
@@ -333,6 +349,86 @@ namespace BusCheckInV2.ViewModels
         private async Task IrAFletesPendientes()
         {
             await Shell.Current.GoToAsync(nameof(FletesPendientes));
+        }
+
+        // FIX 2026-06-02: comando para retomar el último flete pendiente
+        // guardado en Preferences. Lo invoca la pantalla principal cuando
+        // detecta que hay un flete activo guardado (OnAppearing).
+        //
+        // Verifica primero que el flete SIGA EXISTIENDO en SQLite local,
+        // porque la BD pudo haber sido limpiada o el chofer pudo haber
+        // cambiado de dispositivo. Si no existe, limpia las preferences.
+        [RelayCommand]
+        public async Task RetomarUltimoFleteAsync()
+        {
+            int fleteLocalId = Preferences.Get("ultimo_flete_local_id", 0);
+            if (fleteLocalId <= 0)
+            {
+                LimpiarUltimoFleteEnPreferences();
+                return;
+            }
+
+            try
+            {
+                var fleteLocal = await _databaseService
+                    .GetItemAsync<Tb_FlePer_FletePersonal>(fleteLocalId);
+
+                if (fleteLocal == null)
+                {
+                    // La BD fue limpiada, no podemos retomar
+                    LimpiarUltimoFleteEnPreferences();
+                    return;
+                }
+
+                string chofer = Preferences.Get("ultimo_flete_chofer", "");
+                string ruta = Preferences.Get("ultimo_flete_ruta", "");
+
+                var confirmar = await Application.Current.MainPage.DisplayAlert(
+                    "Flete en curso detectado",
+                    $"Tienes un flete sin finalizar:\n\n" +
+                    $"Ruta: {ruta}\n" +
+                    $"Chofer: {chofer}\n\n" +
+                    $"¿Deseas continuar donde lo dejaste?",
+                    "Sí, continuar",
+                    "No, empezar uno nuevo");
+
+                if (confirmar)
+                {
+                    // Navegamos al EscaneoCodigo con el ID guardado
+                    await Shell.Current.GoToAsync(
+                        $"{nameof(EscaneoCodigo)}?fleteLocalId={fleteLocalId}");
+                }
+                else
+                {
+                    // El usuario quiere empezar de nuevo: limpiamos
+                    // la preference y dejamos que cree un flete nuevo
+                    LimpiarUltimoFleteEnPreferences();
+                }
+            }
+            catch (Exception ex)
+            {
+                LimpiarUltimoFleteEnPreferences();
+                await Application.Current.MainPage.DisplayAlert(
+                    "Error",
+                    $"No se pudo retomar el flete anterior: {ex.Message}",
+                    "OK");
+            }
+        }
+
+        // FIX 2026-06-02: helper estático para limpiar las preferences
+        // del último flete. Se invoca desde aquí (cuando el usuario
+        // decide empezar nuevo) y desde EscaneoCodigoViewModel cuando
+        // se finaliza/cancela el viaje exitosamente.
+        public static void LimpiarUltimoFleteEnPreferences()
+        {
+            try
+            {
+                Preferences.Remove("ultimo_flete_local_id");
+                Preferences.Remove("ultimo_flete_chofer");
+                Preferences.Remove("ultimo_flete_ruta");
+                Preferences.Remove("ultimo_flete_fecha");
+            }
+            catch { /* ignore: las prefs se limpian en próxima escritura */ }
         }
         [RelayCommand]
         private async Task Sincronizar()

@@ -6,9 +6,14 @@ using BusCheckInV2.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Maui.ApplicationModel;
+using Microsoft.Maui.Devices.Sensors;
 using Microsoft.Maui.Graphics;
+using Microsoft.Maui.Networking;
+using System;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace BusCheckInV2.ViewModels
@@ -19,7 +24,14 @@ namespace BusCheckInV2.ViewModels
         private readonly IApiFleteService _apiService;
         private readonly IAlertService _alertService;
         private readonly INavigationService _navigationService;
+        private readonly CancellationTokenSource _gpsTokenSource = new();
         private bool _disposed;
+
+        // FIX 2026-06-01 (Problema #3b del usuario): previene que el botón
+        // Actualizar y el pull-to-refresh del RefreshView disparen dos cargas
+        // en paralelo. La primera ganaba el Clear() y la segunda le metía sus
+        // mismos datos al ObservableCollection ya vacío, duplicando filas.
+        private bool _cargaFletesEnCurso;
 
         // ─── PROPIEDADES SIN CAMBIOS ──────────────────────────────────────
 
@@ -72,6 +84,36 @@ namespace BusCheckInV2.ViewModels
             // Extraemos el nombre del usuario seleccionado para usarlo
             // en las llamadas a la API que esperan un string de chofer
             ChoferSeleccionado = value?.Nombre ?? string.Empty;
+
+            // FIX 2026-06-01 (Problema #3a del usuario): auto-cargar fletes
+            // del chofer en cuanto se selecciona. Antes había que pulsar
+            // Actualizar, Sincronizar o deslizar hacia abajo obligatoriamente.
+            // El check ListaUsuarios.Any() evita disparar la carga durante
+            // inicializaciones extrañas (ej. durante el deserializado del VM).
+            // _cargaFletesEnCurso evita loop si la carga dispara SelectedItem
+            // de nuevo (no debería, pero por si acaso).
+            if (!string.IsNullOrEmpty(ChoferSeleccionado) &&
+                ListaUsuarios.Any() &&
+                !_cargaFletesEnCurso)
+            {
+                _ = SafeAutoLoadAsync();
+            }
+        }
+
+        // FIX 2026-06-01: wrapper fire-and-forget seguro para la auto-carga.
+        // OnUsuarioSeleccionadoChanged es void (lo genera el toolkit), así que
+        // no podemos await directamente; pero tampoco queremos tragarnos
+        // excepciones silenciosas como antes.
+        private async Task SafeAutoLoadAsync()
+        {
+            try
+            {
+                await CargarFletesPendientesAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[AutoLoad] {ex.Message}");
+            }
         }
         // ─────────────────────────────────────────────────────────────────
 
@@ -172,8 +214,15 @@ namespace BusCheckInV2.ViewModels
             if (string.IsNullOrEmpty(ChoferSeleccionado))
             {
                 MensajeEstado = "Seleccione un chofer primero";
-                //return;
+                return;
             }
+
+            // FIX 2026-06-01 (Problema #3b): anti-carrera. Si ya hay una
+            // carga en curso (botón Actualizar + pull-to-refresh simultáneos,
+            // o auto-load durante carga manual), la segunda llamada sale
+            // inmediatamente para no duplicar ni corromper el ObservableCollection.
+            if (_cargaFletesEnCurso) return;
+            _cargaFletesEnCurso = true;
 
             try
             {
@@ -190,28 +239,76 @@ namespace BusCheckInV2.ViewModels
 
                     if (apiResponse?.Success == true && apiResponse.Data?.Any() == true)
                     {
-                        fletes = apiResponse.Data.Select(f => new FletePendienteUI
+                        fletes = apiResponse.Data.Select(f =>
                         {
-                            IdFletePer = f.IdFletePer,
-                            Ruta = f.RutaNombre,
-                            FechaHora = DateTime.TryParse(
-                                $"{f.Fecha} {f.Hora}", out var fecha) ? fecha : DateTime.MinValue,
-                            Proveedor = f.ProveedorNombre,
-                            Chofer = f.Chofer,
-                            Estatus = f.Estatus,
-                            CantidadEsperada = f.Cantidad,
-                            TipoFlete = f.TipoFlete,
-                            TipoViaje = f.TipoViaje,
-                            CantidadReal = f.CantidadReal,
-                            FechaInicio = f.FechaInicio,
-                            FechaFin = f.FechaFin
+                            // FIX 2026-06-01 (Problema #3c): parseo de fecha
+                            // robusto. Antes usaba DateTime.TryParse sin
+                            // culture, lo que en dispositivos con cultura
+                            // es-MX dd/MM/yyyy fallaba con "2023-12-01 10:30:00"
+                            // y devolvía DateTime.MinValue, mostrándose
+                            // 01/01/0001 00:00 en la UI. Ahora usamos
+                            // InvariantCulture porque el backend SIEMPRE
+                            // emite ISO 8601 (yyyy-MM-dd HH:mm:ss) desde SQL Server.
+                            DateTime fechaHora = DateTime.MinValue;
+                            string combinado = $"{f.Fecha} {f.Hora}".Trim();
+                            if (!string.IsNullOrWhiteSpace(combinado))
+                            {
+                                if (!DateTime.TryParse(combinado,
+                                        CultureInfo.InvariantCulture,
+                                        DateTimeStyles.AssumeLocal,
+                                        out fechaHora))
+                                {
+                                    // Segundo intento con formatos exactos de SQL Server
+                                    string[] formatos = {
+                                        "yyyy-MM-dd HH:mm:ss",
+                                        "yyyy-MM-dd HH:mm",
+                                        "yyyy-MM-dd",
+                                        "yyyy-MM-ddTHH:mm:ss"
+                                    };
+                                    DateTime.TryParseExact(combinado, formatos,
+                                        CultureInfo.InvariantCulture,
+                                        DateTimeStyles.AssumeLocal,
+                                        out fechaHora);
+                                }
+                            }
+
+                            return new FletePendienteUI
+                            {
+                                IdFletePer = f.IdFletePer,
+                                Ruta = f.RutaNombre,
+                                FechaHora = fechaHora,
+                                Proveedor = f.ProveedorNombre,
+                                Chofer = f.Chofer,
+                                Estatus = f.Estatus,
+                                CantidadEsperada = f.Cantidad,
+                                TipoFlete = f.TipoFlete,
+                                TipoViaje = f.TipoViaje,
+                                CantidadReal = f.CantidadReal,
+                                FechaInicio = f.FechaInicio,
+                                FechaFin = f.FechaFin,
+                                // FIX 2026-06-02 (Nivel 2 #19+#23):
+                                // El backend expone EsPendiente derivado,
+                                // pero la clase FleteResponse del cliente
+                                // (en BusCheckInV2/Models/) todavía no tiene
+                                // esa propiedad → error CS1061 en compilación.
+                                // Lo calculamos AQUÍ con los campos que SÍ
+                                // deserializa FleteResponse (Estatus,
+                                // FechaInicio, FechaFin). Es exactamente la
+                                // misma lógica que el backend, así que el
+                                // resultado es equivalente.
+                                EsPendiente = !string.IsNullOrEmpty(f.Estatus)
+                                    && (f.Estatus.Trim().Equals("P", StringComparison.OrdinalIgnoreCase)
+                                        || f.Estatus.Trim().Equals("I", StringComparison.OrdinalIgnoreCase))
+                                    || (f.FechaInicio.HasValue && f.FechaInicio > DateTime.MinValue
+                                        && (!f.FechaFin.HasValue || f.FechaFin == DateTime.MinValue))
+                            };
                         }).ToList();
                     }
                     else
                     {
                         fletes = await _databaseService.ObtenerFletesPendientesDesdeCacheAsync(
                             ChoferSeleccionado, DiasFiltro);
-                        MensajeEstado = $"API sin datos. Mostrando locales.";
+                        MensajeEstado = "API sin datos. Mostrando locales.";
                     }
                 }
                 else
@@ -221,15 +318,26 @@ namespace BusCheckInV2.ViewModels
                     MensajeEstado = "Modo offline — datos locales";
                 }
 
+                // Aplicar filtro de pendientes usando el helper robusto
                 var fletesFiltrados = MostrarSoloPendientes
-                    ? fletes.Where(f => f.EsPendiente).ToList()
+                    ? fletes.Where(EsFletePendiente).ToList()
                     : fletes;
 
-                foreach (var flete in fletesFiltrados.OrderByDescending(f => f.FechaHora))
+                // FIX 2026-06-01 (Problema #3b): deduplicar por IdFletePer.
+                // Si por algún motivo (doble click + pull, o cache local
+                // que solapa con respuesta API tras reconexión) el mismo
+                // flete viene dos veces, nos quedamos solo con el primero.
+                var fletesUnicos = fletesFiltrados
+                    .GroupBy(f => f.IdFletePer ?? 0)
+                    .Select(g => g.First())
+                    .OrderByDescending(f => f.FechaHora)
+                    .ToList();
+
+                foreach (var flete in fletesUnicos)
                     FletesPendientes.Add(flete);
 
                 var total = FletesPendientes.Count;
-                var pendientes = FletesPendientes.Count(f => f.EsPendiente);
+                var pendientes = FletesPendientes.Count(EsFletePendiente);
                 MensajeEstado = $"Mostrando {total} fletes ({pendientes} pendientes)";
             }
             catch (Exception ex)
@@ -239,7 +347,39 @@ namespace BusCheckInV2.ViewModels
             finally
             {
                 EstaCargando = false;
+                _cargaFletesEnCurso = false;
             }
+        }
+
+        // FIX 2026-06-02: simplificación del helper de pendiente.
+        // Antes usaba reflexión (GetProperty + GetValue) que es:
+        //   1) LENTO: cada llamada recorre el árbol de tipos
+        //   2) FRÁGIL: si el modelo cambia el nombre o tipo, falla silencioso
+        //   3) INNECESARIO: el backend ya expone el campo EsPendiente derivado
+        //
+        // Ahora leemos directamente f.EsPendiente. Mantengo un fallback
+        // DEFENSIVO (no por reflexión) por si alguien aún no actualizó
+        // el modelo FletePendienteUI para tener el campo bool EsPendiente.
+        // El fallback replica la lógica del backend con los datos que SÍ
+        // tenemos seguros (Estatus, FechaInicio, FechaFin).
+        private static bool EsFletePendiente(FletePendienteUI f)
+        {
+            if (f == null) return false;
+
+            // Camino 1 (preferido): el modelo expone EsPendiente (bool)
+            // y el mapeo desde la API lo llena correctamente.
+            if (f.EsPendiente)
+                return true;
+
+            // Camino 2 (fallback): recalcular manualmente si el campo
+            // EsPendiente viniera como false por error de mapeo o por
+            // usar un modelo viejo sin esa propiedad.
+            bool estatusP = !string.IsNullOrEmpty(f.Estatus) &&
+                            f.Estatus.Trim().Equals("P", StringComparison.OrdinalIgnoreCase);
+            bool tieneInicio = f.FechaInicio.HasValue && f.FechaInicio > DateTime.MinValue;
+            bool tieneFin = f.FechaFin.HasValue && f.FechaFin > DateTime.MinValue;
+
+            return estatusP || (tieneInicio && !tieneFin);
         }
 
         // ─── COMANDOS RESTANTES SIN CAMBIOS DE LÓGICA ────────────────────
@@ -272,9 +412,15 @@ namespace BusCheckInV2.ViewModels
             {
                 EstaCargando = true;
 
+                // FIX (2026-06-01): se obtiene la posición real del GPS en lugar
+                // de enviar 0,0 (Null Island). El backend inserta un punto "FIN"
+                // con estas coordenadas, así que un (0,0) deja el viaje finalizado
+                // en mitad del Atlántico en lugar de en la parada real del chofer.
+                var (lat, lon) = await GetLatLonOrZeroAsync();
+
                 var exito = HayConexionInternet && _apiService != null
                     ? await _apiService.ValidarYFinalizarFleteAsync(
-                        flete.IdFletePer ?? 0, cantidadValidada, observaciones ?? "", 0, 0)
+                        flete.IdFletePer ?? 0, cantidadValidada, observaciones ?? "", lat, lon)
                     : true;
 
                 if (exito)
@@ -351,11 +497,41 @@ namespace BusCheckInV2.ViewModels
         [RelayCommand]
         private async Task VolverAsync() => await _navigationService.GoBackAsync();
 
+        // FIX (2026-06-01): helper para no enviar 0,0 al backend.
+        // Devuelve (0,0) solo si el GPS no responde (sin permiso, sin señal, etc.)
+        // para mantener la firma de la API; pero al menos el caso normal
+        // (GPS disponible) registra la posición real del cierre.
+        private async Task<(double Lat, double Lon)> GetLatLonOrZeroAsync()
+        {
+            try
+            {
+                var req = new GeolocationRequest(GeolocationAccuracy.Medium, TimeSpan.FromSeconds(8));
+                var loc = await Geolocation.GetLocationAsync(req, _gpsTokenSource.Token);
+                if (loc != null)
+                    return (loc.Latitude, loc.Longitude);
+            }
+            catch
+            {
+                // Permiso denegado, sin hardware, timeout, etc. Caer a (0,0)
+                // es aceptable: el backend registrará el FIN con timestamp.
+            }
+            return (0, 0);
+        }
+
         public void Dispose()
         {
             if (_disposed) return;
             _disposed = true;
             Connectivity.ConnectivityChanged -= OnConnectivityChanged;
+            // FIX (2026-06-01): cancelar y liberar el token del GPS para que
+            // cualquier Geolocation.GetLocationAsync en curso se detenga limpio
+            // cuando el ViewModel sea disposed por DI al cerrar la app.
+            try
+            {
+                _gpsTokenSource.Cancel();
+                _gpsTokenSource.Dispose();
+            }
+            catch { /* ya disposed, ignorar */ }
         }
         //public override void Dispose()
         //{

@@ -1,119 +1,129 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:viewmodels="clr-namespace:BusCheckInV2.ViewModels"
-             xmlns:barcode="clr-namespace:BarcodeScanning;assembly=BarcodeScanning.Native.Maui"
-             x:Class="BusCheckInV2.Views.EscaneoCodigo"
-             Title="Check-in de Pasajeros"
-             x:DataType="viewmodels:EscaneoCodigoViewModel"
-             Unloaded="ContentPage_Unloaded">
+<ContentPage
+    x:Class="BusCheckInV2.Views.EscaneoCodigo"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:models="clr-namespace:BusCheckInV2.Models"
+    xmlns:px="clr-namespace:BarcodeScanning;assembly=BarcodeScanning.Native.Maui"
+    xmlns:viewmodels="clr-namespace:BusCheckInV2.ViewModels"
+    Title="Check-in de Pasajeros"
+    x:DataType="viewmodels:EscaneoCodigoViewModel"
+    Unloaded="ContentPage_Unloaded">
 
-    <Grid Padding="16,8"
-          RowDefinitions="Auto,*,Auto,Auto"
-          RowSpacing="12">
-        <!--  Header  -->
+    <Grid
+        Padding="16,8"
+        RowDefinitions="Auto,*,Auto"
+        RowSpacing="12">
+
         <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto">
+
             <Border Style="{StaticResource CardFrameStyle}">
-                <Label Text="{Binding TotalPasajerosText}"
-                       FontAttributes="Bold"
-                       FontSize="Medium"
-                       Style="{StaticResource CardTitleLabelStyle}" />
+                <Label
+                    FontAttributes="Bold"
+                    FontSize="Medium"
+                    Style="{StaticResource CardTitleLabelStyle}"
+                    Text="{Binding TotalPasajerosText}" />
             </Border>
-            <Grid Grid.Column="1" RowDefinitions="Auto,Auto">
-                <Label Grid.Row="0"
-                       Text="{Binding IsConnected, Converter={StaticResource ConnectionStatusConverter}}"
-                       TextColor="{Binding IsConnected, Converter={StaticResource ConnectionColorConverter}}" />
-                <Label Grid.Row="1"
-                       Text="{Binding SyncStatus}"
-                       TextColor="{Binding SyncStatus, Converter={StaticResource StatusToColorConverter}}" />
+
+            <Grid
+                Grid.Column="1"
+                Margin="8,0"
+                RowDefinitions="Auto,Auto">
+                <Label
+                    Grid.Row="0"
+                    FontSize="11"
+                    Text="{Binding IsConnected, Converter={StaticResource ConnectionStatusConverter}}"
+                    TextColor="{Binding IsConnected, Converter={StaticResource ConnectionColorConverter}}" />
+                <Label
+                    Grid.Row="1"
+                    FontSize="11"
+                    Text="{Binding SyncStatus}"
+                    TextColor="{Binding SyncStatus, Converter={StaticResource StatusToColorConverter}}" />
             </Grid>
-            <Button Grid.Column="2"
-                    Text="{Binding TextoBotonEscaneo}"
-                    Command="{Binding ToggleScanCommand}"
-                    IsEnabled="{Binding CanScan}"
-                    Style="{StaticResource PrimaryButtonStyle}" />
+
+            <Button
+                Grid.Column="2"
+                Command="{Binding ToggleScanCommand}"
+                IsEnabled="{Binding CanScan}"
+                Style="{StaticResource PrimaryButtonStyle}"
+                Text="{Binding TextoBotonEscaneo}" />
         </Grid>
 
-        <!--  Camera  -->
-        <Border Grid.Row="1"
-                StrokeShape="RoundRectangle 16"
-                StrokeThickness="1"
-                Background="Black">
+        <Border
+            Grid.Row="1"
+            Background="Black"
+            StrokeShape="RoundRectangle 16"
+            StrokeThickness="1">
             <Grid x:Name="CameraContainer">
-                <ActivityIndicator IsVisible="{Binding IsSyncing}"
-                                   IsRunning="{Binding IsSyncing}"
-                                   HorizontalOptions="Center"
-                                   VerticalOptions="Center"
-                                   Color="White" />
-                <Button Margin="10"
-                        IsVisible="{Binding IsScanning}"
-                        Text="Flash"
-                        Command="{Binding ToggleTorchCommand}"
-                        HorizontalOptions="End"
-                        VerticalOptions="Start"
-                        BackgroundColor="Transparent"
-                        TextColor="White"
-                        BorderColor="White"
-                        BorderWidth="1"
-                        CornerRadius="20"
-                        WidthRequest="80"
-                        HeightRequest="40" />
+
+                <px:CameraView
+                    BarcodeSymbologies="Code39"
+                    CameraEnabled="{Binding IsScanning}"
+                    HorizontalOptions="Fill"
+                    OnDetectionFinishedCommand="{Binding ProcessBarcodeResultsCommand}"
+                    TorchOn="{Binding IsTorchOn}"
+                    VerticalOptions="Fill" />
+
+                <ActivityIndicator
+                    HorizontalOptions="Center"
+                    IsRunning="{Binding IsSyncing}"
+                    IsVisible="{Binding IsSyncing}"
+                    VerticalOptions="Center"
+                    Color="White" />
+
+                <Button
+                    Margin="10"
+                    BackgroundColor="Transparent"
+                    BorderColor="White"
+                    BorderWidth="1"
+                    Command="{Binding ToggleTorchCommand}"
+                    CornerRadius="20"
+                    HeightRequest="40"
+                    HorizontalOptions="End"
+                    IsVisible="{Binding IsScanning}"
+                    Text="Flash"
+                    TextColor="White"
+                    VerticalOptions="Start"
+                    WidthRequest="80" />
             </Grid>
         </Border>
 
-        <!--  Search y Manual Entry  -->
-        <Grid Grid.Row="2" RowDefinitions="Auto,Auto">
-            <Entry Grid.Row="0"
-                   Placeholder="Buscar por nómina"
-                   Text="{Binding SearchText}"
-                   Keyboard="Numeric" />
-            <Grid Grid.Row="1" ColumnDefinitions="*,Auto">
-                <Entry x:Name="ManualEntry"
-                       Placeholder="Ingresar código manualmente"
-                       Text="{Binding ManualEntryText, Mode=TwoWay}"
-                       Keyboard="Numeric" />
-                <Button Grid.Column="1"
-                        Text="Agregar"
-                        Command="{Binding AddManualCommand}"
-                        HorizontalOptions="End" />
-            </Grid>
+        <Grid
+            Grid.Row="2"
+            RowDefinitions="*,Auto"
+            RowSpacing="8">
+
+            <CollectionView
+                Grid.Row="0"
+                HeightRequest="220"
+                ItemsSource="{Binding Pasajeros}">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="models:Tb_FlePer_DetFlete">
+                        <Border
+                            Margin="4,2"
+                            Padding="14,10"
+                            BackgroundColor="{AppThemeBinding Light=White,
+                                                              Dark=#1E1E1E}"
+                            Stroke="#E0E0E0"
+                            StrokeShape="RoundRectangle 10">
+                            <Label
+                                FontAttributes="Bold"
+                                FontSize="14"
+                                Text="{Binding DisplayText}"
+                                TextColor="{AppThemeBinding Light=#1A1A1A,
+                                                            Dark=White}"
+                                VerticalOptions="Center" />
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
+            <Button
+                Grid.Row="1"
+                Command="{Binding FinalizarViajeCommand}"
+                Style="{StaticResource DangerButtonStyle}"
+                Text="Finalizar Viaje" />
         </Grid>
 
-        <!--  Lista Pasajeros  -->
-        <ScrollView Grid.Row="3">
-            <Grid RowDefinitions="*,Auto" RowSpacing="12">
-                <CollectionView ItemsSource="{Binding Pasajeros}" HeightRequest="180">
-                    <CollectionView.ItemTemplate>
-                        <DataTemplate>
-                            <Border Margin="4,0"
-                                    Padding="12,8"
-                                    BackgroundColor="White"
-                                    Stroke="#E0E0E0"
-                                    StrokeShape="RoundRectangle 12">
-                                <Grid ColumnDefinitions="Auto,*">
-                                    <Image Source="person_icon.png"
-                                           WidthRequest="32"
-                                           HeightRequest="32"
-                                           Aspect="AspectFit"
-                                           VerticalOptions="Center" />
-                                    <Label Grid.Column="1"
-                                           Margin="12,0,0,0"
-                                           Text="{Binding CveNomina, Converter={StaticResource AnonymizeConverter}}"
-                                           FontAttributes="Bold"
-                                           FontSize="Medium"
-                                           TextColor="#1A1A1A"
-                                           VerticalOptions="Center" />
-                                </Grid>
-                            </Border>
-                        </DataTemplate>
-                    </CollectionView.ItemTemplate>
-                </CollectionView>
-                <Button Grid.Row="1"
-                        Text="Finalizar Viaje"
-                        Command="{Binding FinalizarViajeCommand}"
-                        IsEnabled="{Binding Pasajeros.Count, Converter={StaticResource IntToBoolConverter}}"
-                        Style="{StaticResource DangerButtonStyle}" />
-            </Grid>
-        </ScrollView>
     </Grid>
 </ContentPage>

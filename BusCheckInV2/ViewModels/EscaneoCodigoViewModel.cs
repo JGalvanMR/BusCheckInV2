@@ -1,12 +1,11 @@
-﻿using Android.Database.Sqlite;
-using BarcodeScanning;
+﻿using BarcodeScanning;
 using BusCheckInV2.Models;
 using BusCheckInV2.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Maui.Devices.Sensors;
+using Microsoft.Maui.Networking;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -15,21 +14,20 @@ using System.Threading.Tasks;
 
 namespace BusCheckInV2.ViewModels
 {
-    public partial class EscaneoCodigoViewModel : BaseViewModel, IQueryAttributable
+    public partial class EscaneoCodigoViewModel : BaseViewModel, IQueryAttributable, IDisposable
     {
         private readonly ISQLiteService _databaseService;
         private readonly IApiFleteService _apiService;
         private readonly IAlertService _alertService;
         private readonly INavigationService _navigationService;
         private readonly IAudioService _audioService;
-        private readonly SemaphoreSlim _syncSemaphore = new(1, 1);
-        private readonly ConcurrentQueue<string> _pendingOperations = new();
 
+        private readonly SemaphoreSlim _syncSemaphore = new(1, 1);
+        private readonly CancellationTokenSource _cancellationTokenSource = new();
+
+        // ── Propiedades de UI con Binding ───────────────────────────────────
         [ObservableProperty]
         private ObservableCollection<Tb_FlePer_DetFlete> _pasajeros = new();
-
-        [ObservableProperty]
-        private ObservableCollection<Tb_FlePer_DetFlete> _allPasajeros = new();
 
         [ObservableProperty]
         private string _totalPasajerosText = "Pasajeros: 0";
@@ -42,13 +40,7 @@ namespace BusCheckInV2.ViewModels
         private bool _isSyncing;
 
         [ObservableProperty]
-        private bool _isFinalizarEnabled = true;
-
-        [ObservableProperty]
         private string _syncStatus = "Pendiente";
-
-        [ObservableProperty]
-        private string _searchText = string.Empty;
 
         [ObservableProperty]
         private bool _isScanning;
@@ -62,49 +54,25 @@ namespace BusCheckInV2.ViewModels
         [ObservableProperty]
         private bool _isProcessingBarcode;
 
-        [ObservableProperty]
-        private string _manualEntryText = string.Empty;
+        // Si está sincronizando, apaga la cámara para liberar recursos físicos
         public bool CanScan => !IsSyncing;
 
-        private int? _folioFlete;
-        /// <summary>
-        /// Cache del IdFletePer del servidor. Se popula después de que
-        /// SincronizarFletePadreAsync termina exitosamente.
-        /// Volatile garantiza visibilidad entre threads (background sync + UI).
-        /// </summary>
-        private readonly string _patronNumeros = @"^[0-9]+$";
-        private const int SyncIntervalSeconds = 15;
-        public bool HasPendingSyncOperations => !_pendingOperations.IsEmpty || Pasajeros.Any(p => !p.IsSynced);
-
-        #region Estado Interno
+        // ── Estado interno ─────────────────────────────────────────────────
         private int _fleteLocalId;
         private long _serverIdFletePer;
         private bool _isSyncInProgress;
         private bool _initialized;
         private bool _inicioRegistrado;
-        #endregion
 
-        // ─── NUEVO MÉTODO: Recibe parámetros de navegación Shell ──────────────
-        // MAUI llama a este método automáticamente ANTES de que la página
-        // aparezca en pantalla, cuando se navega con query parameters.
-        // El diccionario contiene los pares clave=valor de la URL.
+        private const string PatronNumeros = @"^[0-9]+$";
+        private const int SyncIntervalSegundos = 15;
+
+        // ── Navegación y Parámetros ────────────────────────────────────────
         public void ApplyQueryAttributes(IDictionary<string, object> query)
         {
-            // Verificamos que el parámetro "fleteLocalId" exista en la URL
-            if (query.TryGetValue("fleteLocalId", out var value))
-            {
-                // Convertimos el valor (llega como string) a int
-                if (int.TryParse(value?.ToString(), out int id) && id > 0)
-                {
-                    _fleteLocalId = id;
-                    Console.WriteLine($"[EscaneoVM] Flete local ID recibido: {_fleteLocalId}");
-                }
-                else
-                {
-                    // Log de seguridad: el parámetro llegó pero no es válido
-                    Console.WriteLine($"[EscaneoVM] ADVERTENCIA: fleteLocalId inválido: {value}");
-                }
-            }
+            if (query.TryGetValue("fleteLocalId", out var val) &&
+                int.TryParse(val?.ToString(), out int id) && id > 0)
+                _fleteLocalId = id;
         }
 
         public EscaneoCodigoViewModel(
@@ -121,76 +89,95 @@ namespace BusCheckInV2.ViewModels
             _audioService = audioService;
         }
 
-        // ─── CAMBIO: Guard corregido ──────────────────────────────────────────
-        // El guard original era incorrecto:
-        //   if (_folioFlete.HasValue) return;   ← devuelve si YA tiene valor
-        // Lo que queremos es NO inicializar si NO tenemos flete
+        // ── Inicialización de la Pantalla ──────────────────────────────────
         public async Task InitializeAsync()
         {
-            // Si no tenemos un flete válido, no tiene sentido inicializar el escaneo
+            if (_initialized) return;
+            _initialized = true;
+
             if (_fleteLocalId == 0)
             {
-                Console.WriteLine("[EscaneoVM] ERROR: InitializeAsync sin fleteLocalId");
-                await _alertService.ShowAlertAsync(
-                    "Error",
-                    "No se pudo iniciar el escaneo. Regresa y selecciona un flete.");
+                await _alertService.ShowAlertAsync("Error", "Flete inválido. Regresa e intenta de nuevo.");
                 return;
             }
 
+            // Monitoreo de Red
+            Connectivity.ConnectivityChanged += OnConnectivityChanged;
             IsConnected = Connectivity.Current.NetworkAccess == NetworkAccess.Internet;
-            await UpdateTotalPasajerosAsync();
-            await CargarPasajerosExistentesAsync(); // ← NUEVO: carga escaneos previos de este flete
 
+            // Carga de Datos SQLite
+            await CargarPasajerosExistentesAsync();
+            await InsertarInicioSiNecesarioAsync();
+            ActualizarTotalPasajeros();
+
+            // Sincronización Inicial Activa si hay red
             if (IsConnected)
-                await TrySyncDataAsync();
+                _ = Task.Run(TrySyncDataAsync);
 
+            // Arrancar el Demonio en segundo plano
             StartSyncService();
         }
-        public async Task InitializeAsyncLEGACY()
+
+        private void OnConnectivityChanged(object sender, ConnectivityChangedEventArgs e)
         {
-            if (_folioFlete.HasValue) return;
-
-            IsConnected = Connectivity.Current.NetworkAccess == NetworkAccess.Internet;
-            await UpdateTotalPasajerosAsync();
-
-            _pendingOperations.Enqueue("FLETE");
-            _pendingOperations.Enqueue("INICIO");
-
+            IsConnected = e.NetworkAccess == NetworkAccess.Internet;
             if (IsConnected)
-                await TrySyncDataAsync();
-
-            StartSyncService();
+                _ = Task.Run(TrySyncDataAsync);
         }
 
-        // ─── NUEVO MÉTODO: Carga pasajeros ya escaneados si se regresa al flete
         private async Task CargarPasajerosExistentesAsync()
         {
-            try
+            var flete = await _databaseService.GetItemAsync<Tb_FlePer_FletePersonal>(_fleteLocalId);
+            if (flete?.IdFletePer > 0)
+                _serverIdFletePer = flete.IdFletePer.Value;
+
+            var todosDetalles = await _databaseService.GetItemsAsync<Tb_FlePer_DetFlete>();
+
+            var deEsteViaje = todosDetalles
+                .Where(d => d.FleteLocalId == _fleteLocalId ||
+                            (d.FleteLocalId == 0 && (d.IdFletePer == (long)_fleteLocalId ||
+                             (_serverIdFletePer > 0 && d.IdFletePer == _serverIdFletePer))))
+                .OrderBy(d => d.Fecha)
+                .ToList();
+
+            // Migración de datos (One-shot)
+            foreach (var d in deEsteViaje.Where(d => d.FleteLocalId == 0))
             {
-                // Obtiene todos los detalles de este flete específico desde SQLite
-                var todosDetalles = await _databaseService.GetItemsAsync<Tb_FlePer_DetFlete>();
-                var detallesDeEsteFlete = todosDetalles
-                    .Where(d => d.IdFletePer == _fleteLocalId)
-                    .ToList();
-
-                Pasajeros.Clear();
-                AllPasajeros.Clear();
-
-                foreach (var detalle in detallesDeEsteFlete)
-                {
-                    Pasajeros.Add(detalle);
-                    AllPasajeros.Add(detalle);
-                }
-
-                await UpdateTotalPasajerosAsync();
-                Console.WriteLine($"[EscaneoVM] Cargados {detallesDeEsteFlete.Count} pasajeros existentes");
+                d.FleteLocalId = _fleteLocalId;
+                await _databaseService.UpdateAsync(d);
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[EscaneoVM] Error cargando pasajeros existentes: {ex.Message}");
-            }
+
+            Pasajeros.Clear();
+            foreach (var d in deEsteViaje)
+                Pasajeros.Add(d);
+
+            if (deEsteViaje.Any(d => d.CveNomina == 0))
+                _inicioRegistrado = true;
         }
 
+        private async Task InsertarInicioSiNecesarioAsync()
+        {
+            if (_inicioRegistrado) return;
+
+            var location = await GetCurrentLocationAsync();
+            var inicio = new Tb_FlePer_DetFlete
+            {
+                FleteLocalId = _fleteLocalId,
+                IdFletePer = _serverIdFletePer > 0 ? _serverIdFletePer : (long)_fleteLocalId,
+                CveNomina = 0,
+                Latitud = location?.Latitude ?? 0,
+                Longitud = location?.Longitude ?? 0,
+                Fecha = DateTime.Now,
+                Nombre = "INICIO",
+                IsSynced = false
+            };
+
+            await _databaseService.InsertAsync(inicio);
+            Pasajeros.Insert(0, inicio);
+            _inicioRegistrado = true;
+        }
+
+        // ── Comandos del Escáner (BarcodeScanning V3 Nativo) ──────────────────
         [RelayCommand]
         private void ToggleTorch() => IsTorchOn = !IsTorchOn;
 
@@ -198,126 +185,143 @@ namespace BusCheckInV2.ViewModels
         private void ToggleScan()
         {
             IsScanning = !IsScanning;
-            IsTorchOn = IsScanning;
+            if (!IsScanning) IsTorchOn = false; // Apagar flash por cortesía
             TextoBotonEscaneo = IsScanning ? "Detener" : "Escanear";
-            if (IsScanning) SearchText = string.Empty;
         }
 
         [RelayCommand]
-        public async Task ProcessBarcodeResultsAsync(IReadOnlySet<BarcodeResult> barcodeResults)
+        public async Task ProcessBarcodeResultsAsync(HashSet<BarcodeResult> barcodeResults)
         {
-            if (barcodeResults?.Count is 0 || _isProcessingBarcode) return;
+            // Modificado para aceptar HashSet según tu código fuente
+            if (barcodeResults == null || barcodeResults.Count == 0 || _isProcessingBarcode)
+                return;
 
             try
             {
                 _isProcessingBarcode = true;
-                IsScanning = false;
+                IsScanning = false; // Detiene la lectura reactiva en UI
 
-                var barcodeValue = barcodeResults.First().RawValue?.Trim();
-                if (!string.IsNullOrWhiteSpace(barcodeValue))
-                    await ProcessBarcodeValueAsync(barcodeValue);
+                // Se usa .First() del namespace System.Linq
+                var valor = barcodeResults.First().RawValue?.Trim();
+                if (!string.IsNullOrWhiteSpace(valor))
+                    await ProcessBarcodeValueAsync(valor);
             }
             finally
             {
                 _isProcessingBarcode = false;
-                IsScanning = true;
+
+                // Si el botón sigue en modo "Detener", reanudamos el escáner
+                if (TextoBotonEscaneo == "Detener")
+                {
+                    IsScanning = true;
+                }
             }
         }
 
         private async Task ProcessBarcodeValueAsync(string barcodeValue)
         {
-            if (!ValidateBarcode(barcodeValue, out int numeroNomina)) return;
+            if (!ValidarCodigo(barcodeValue, out int nomina)) return;
 
-            var location = await GetCurrentLocationAsync();
-            if (location == null) return;
+            // FIX 2026-06-01 (Problema #1 del usuario):
+            // Antes, si _databaseService.InsertAsync lanzaba una excepción
+            // (modelo desincronizado con la tabla, columna faltante, FK
+            // violada, etc.), la UI seguía actualizándose porque el
+            // Pasajeros.Add quedaba después del throw. Resultado: el chofer
+            // veía el pasajero "registrado" pero la fila JAMÁS llegaba a
+            // SQLite. Ahora:
+            //   1) envolvemos el InsertAsync en try/catch con log a Consola
+            //   2) mostramos alerta al usuario para que sepa que NO se guardó
+            //   3) si falla, NO actualizamos la UI (no engañamos al chofer)
+            //   4) aislamos GPS y audio en bloques try/catch separados para
+            //      que un fallo de hardware no impida la inserción.
 
-            await _audioService.PlayBeepAsync();
+            Location? location = null;
+            try { location = await GetCurrentLocationAsync(); }
+            catch { location = null; /* GPS best-effort */ }
 
-            // ── CORRECCIÓN RACE CONDITION ─────────────────────────────────────────
-            // Si el padre ya fue sincronizado, usamos el ID del servidor directamente.
-            // Si no, usamos el ID local — ActualizarIdFleteEnDetallesAsync lo corregirá
-            // después de que SincronizarFletePadreAsync termine.
-            // Leer _serverIdFletePer en este punto es seguro (volatile field).
-            long idParaDetalle = _serverIdFletePer > 0
-                ? _serverIdFletePer
-                : _fleteLocalId;
+            try { await _audioService.PlayBeepAsync(); }
+            catch { /* audio best-effort */ }
 
-            var nuevoPasajero = new Tb_FlePer_DetFlete
+            var registro = new Tb_FlePer_DetFlete
             {
-                IdFletePer = idParaDetalle,
-                CveNomina = numeroNomina,
-                Latitud = location.Latitude,
-                Longitud = location.Longitude,
+                FleteLocalId = _fleteLocalId,
+                IdFletePer = _serverIdFletePer > 0 ? _serverIdFletePer : (long)_fleteLocalId,
+                CveNomina = nomina,
+                Latitud = location?.Latitude ?? 0,
+                Longitud = location?.Longitude ?? 0,
                 Fecha = DateTime.Now,
+                Nombre = null,
                 IsSynced = false
             };
 
-            Pasajeros.Add(nuevoPasajero);
-            AllPasajeros.Add(nuevoPasajero);
-            await UpdateTotalPasajerosAsync();
-            await _databaseService.InsertAsync(nuevoPasajero);
-
-            if (IsConnected)
-                await TrySyncDataAsync();
-            else
-                SyncStatus = "Pendiente (Offline)";
-        }
-        private async Task ProcessBarcodeValueAsyncLEGACY(string barcodeValue)
-        {
-            if (!ValidateBarcode(barcodeValue, out int numeroNomina)) return;
-
-            var location = await GetCurrentLocationAsync();
-            if (location == null) return;
-
-            await _audioService.PlayBeepAsync();
-
-            var nuevoPasajero = new Tb_FlePer_DetFlete
+            try
             {
-                IdFletePer = _folioFlete,
-                CveNomina = numeroNomina,
-                Latitud = location.Latitude,
-                Longitud = location.Longitude,
-                Fecha = DateTime.Now,
-                IsSynced = false
-            };
+                await _databaseService.InsertAsync(registro);
 
-            Pasajeros.Add(nuevoPasajero);
-            AllPasajeros.Add(nuevoPasajero);
-            await UpdateTotalPasajerosAsync();
+                // Verificación de lectura: si el wrapper InsertAsync no
+                // garantiza persistencia, releer para confirmar. Algunos
+                // wrappers de sqlite-net devuelven el Id autogen; otros
+                // solo garantizan que la operación se enqueó.
+                var verificacion = await _databaseService
+                    .GetItemsAsync<Tb_FlePer_DetFlete>();
+                var existe = verificacion.Any(d =>
+                    d.FleteLocalId == _fleteLocalId &&
+                    d.CveNomina == nomina &&
+                    d.Fecha == registro.Fecha);
 
-            // Guardar en BD
-            await _databaseService.InsertAsync(nuevoPasajero);
-
-            if (IsConnected)
-            {
-                _pendingOperations.Enqueue("REGISTROS");
-                await TrySyncDataAsync();
+                if (!existe)
+                {
+                    Console.WriteLine(
+                        $"[Scan] ADVERTENCIA: InsertAsync regresó OK pero " +
+                        $"el registro {nomina} no aparece al releer. " +
+                        $"Posible problema del wrapper ISQLiteService.");
+                }
             }
-            else
+            catch (Exception ex)
             {
-                SyncStatus = "Pendiente (Offline)";
+                Console.WriteLine($"[Scan] ERROR insertando pasajero {nomina}: {ex.Message}");
+                Console.WriteLine(ex.StackTrace);
+                try
+                {
+                    await _alertService.ShowAlertAsync(
+                        "Error de guardado",
+                        $"No se pudo guardar el pasajero con nómina {nomina} " +
+                        $"en la base de datos local. EL REGISTRO NO FUE GUARDADO.\n\n" +
+                        $"Vuelve a escanearlo. Si el problema persiste, anota la " +
+                        $"nómina y repórtalo.\n\nDetalle técnico: {ex.Message}");
+                }
+                catch { /* si ni la alerta funciona, al menos quedó en consola */ }
+                return; // crítico: NO actualizar UI si no se guardó
             }
+
+            // Solo llegamos aquí si la inserción fue exitosa
+            var idxFin = -1;
+            for (int i = 0; i < Pasajeros.Count; i++)
+                if (Pasajeros[i].CveNomina == 9999) { idxFin = i; break; }
+
+            if (idxFin >= 0) Pasajeros.Insert(idxFin, registro);
+            else Pasajeros.Add(registro);
+
+            ActualizarTotalPasajeros();
+
+            if (IsConnected) _ = Task.Run(TrySyncDataAsync);
+            else SyncStatus = "Pendiente (Offline)";
         }
 
-        private bool ValidateBarcode(string barcodeValue, out int numeroNomina)
+        private bool ValidarCodigo(string valor, out int nomina)
         {
-            numeroNomina = 0;
-
-            // Primera validación: formato del código
-            if (string.IsNullOrWhiteSpace(barcodeValue) ||
-                !Regex.IsMatch(barcodeValue, _patronNumeros) ||
-                !int.TryParse(barcodeValue, out numeroNomina))
+            nomina = 0;
+            if (string.IsNullOrWhiteSpace(valor) ||
+                !Regex.IsMatch(valor, PatronNumeros) ||
+                !int.TryParse(valor, out nomina))
             {
                 _audioService.PlayErrorAsync().FireAndForgetSafeAsync(_alertService);
                 _alertService.ShowAlertAsync("Error", "Código inválido").FireAndForgetSafeAsync(_alertService);
                 return false;
             }
 
-            // ✅ SOLUCIÓN: Capturar el valor en una variable local
-            int nominaCapturada = numeroNomina;
-
-            // Segunda validación: duplicados
-            if (Pasajeros.Any(p => p.CveNomina == nominaCapturada)) // ✅ Usar variable local
+            int nominaCapturada = nomina;
+            if (Pasajeros.Any(p => p.CveNomina == nominaCapturada && p.Nombre == null))
             {
                 _audioService.PlayErrorAsync().FireAndForgetSafeAsync(_alertService);
                 _alertService.ShowAlertAsync("Advertencia", "Pasajero ya registrado").FireAndForgetSafeAsync(_alertService);
@@ -327,82 +331,115 @@ namespace BusCheckInV2.ViewModels
             return true;
         }
 
+        // ── Lógica de Sincronización Remota ──────────────────────────────────
 
-        #region SINCRONIZACION CON BASE DE DATOS REMOTA
-        // BusCheckInV2/ViewModels/EscaneoCodigoViewModel.cs
-        // Reemplaza completamente el método TrySyncDataAsync y agrega los métodos de apoyo
+        /// <summary>
+        /// FIX 2026-06-01 (Problema #2 del usuario): cuenta los registros
+        /// pendientes de sincronización para que la vista pueda bloquear
+        /// la salida del usuario hasta que todo esté en el servidor.
+        /// Cuenta tanto el flete padre (si nunca se subió) como los
+        /// detalles (pasajeros) con IsSynced = false.
+        /// </summary>
+        public async Task<int> ContarPendientesSyncAsync()
+        {
+            try
+            {
+                if (_fleteLocalId == 0) return 0;
+
+                int count = 0;
+                var flete = await _databaseService
+                    .GetItemAsync<Tb_FlePer_FletePersonal>(_fleteLocalId);
+                if (flete != null && !flete.IsSynced) count++;
+
+                var detalles = await _databaseService
+                    .GetItemsAsync<Tb_FlePer_DetFlete>();
+                count += detalles.Count(d =>
+                    d.FleteLocalId == _fleteLocalId && !d.IsSynced);
+
+                return count;
+            }
+            catch
+            {
+                return 0; // si falla, no bloquear al usuario por error de lectura
+            }
+        }
+
+        /// <summary>
+        /// FIX 2026-06-01 (Problema #2 del usuario): expone un intento de
+        /// sincronización para que la vista lo dispare cuando el usuario
+        /// elige "Reintentar sincronización" en el diálogo de salida.
+        /// </summary>
+        public async Task IntentarSincronizarAsync()
+        {
+            try
+            {
+                await TrySyncDataAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[SyncManual] {ex.Message}");
+            }
+        }
+
+        private async Task<bool> TienePendientesAsync()
+        {
+            try
+            {
+                var flete = await _databaseService.GetItemAsync<Tb_FlePer_FletePersonal>(_fleteLocalId);
+                if (flete == null) return false;
+                if (!flete.IsSynced) return true;
+
+                var detalles = await _databaseService.GetItemsAsync<Tb_FlePer_DetFlete>();
+                return detalles.Any(d => d.FleteLocalId == _fleteLocalId && !d.IsSynced);
+            }
+            catch { return false; }
+        }
 
         private async Task TrySyncDataAsync()
         {
-            // Guard: no sincronizar si ya hay una en curso o no hay internet
             if (_isSyncInProgress || !IsConnected) return;
 
             await _syncSemaphore.WaitAsync();
             try
             {
                 _isSyncInProgress = true;
-                IsSyncing = true;
-                IsFinalizarEnabled = false;
+                await MainThread.InvokeOnMainThreadAsync(() => IsSyncing = true);
 
-                Console.WriteLine($"[Sync] Iniciando sincronización para flete local {_fleteLocalId}");
-
-                // Fase 1: Sincronizar el flete padre
-                // Si el flete ya tiene IdFletePer (fue sincronizado antes), esta fase se salta
                 await SincronizarFletePadreAsync();
-
-                // Fase 2: Sincronizar los detalles (pasajeros escaneados)
-                // Solo se ejecuta si el flete padre ya tiene un IdFletePer válido del servidor
                 await SincronizarDetallesAsync();
 
-                SyncStatus = "Sincronizado";
-                Console.WriteLine("[Sync] Sincronización completada exitosamente");
+                await MainThread.InvokeOnMainThreadAsync(() => SyncStatus = "Sincronizado ✓");
             }
             catch (Exception ex)
             {
-                // No crashear — simplemente marcamos como pendiente
-                SyncStatus = "Pendiente";
-                Console.WriteLine($"[Sync] Error durante sincronización: {ex.Message}");
+                Console.WriteLine($"[Sync] Error: {ex.Message}");
+                await MainThread.InvokeOnMainThreadAsync(() => SyncStatus = "Pendiente");
             }
             finally
             {
                 _isSyncInProgress = false;
-                IsSyncing = false;
-                IsFinalizarEnabled = true;
+                await MainThread.InvokeOnMainThreadAsync(() => IsSyncing = false);
                 _syncSemaphore.Release();
             }
         }
 
-        // ─── FASE 1: Sincronizar el flete padre ──────────────────────────────────────
         private async Task SincronizarFletePadreAsync()
         {
             if (_fleteLocalId == 0) return;
 
-            // Obtener el flete local desde SQLite
             var fleteLocal = await _databaseService.GetItemAsync<Tb_FlePer_FletePersonal>(_fleteLocalId);
+            if (fleteLocal == null) return;
 
-            if (fleteLocal == null)
+            if (fleteLocal.IsSynced && fleteLocal.IdFletePer > 0)
             {
-                Console.WriteLine($"[Sync] No se encontró flete local con Id={_fleteLocalId}");
+                _serverIdFletePer = fleteLocal.IdFletePer.Value;
                 return;
             }
 
-            // Si ya fue sincronizado y tiene ID del servidor, no hacemos nada
-            if (fleteLocal.IsSynced && fleteLocal.IdFletePer.HasValue && fleteLocal.IdFletePer > 0)
-            {
-                Console.WriteLine($"[Sync] Flete padre ya sincronizado. IdFletePer servidor={fleteLocal.IdFletePer}");
-                return;
-            }
-
-            Console.WriteLine($"[Sync] Sincronizando flete padre Id={_fleteLocalId}...");
-
-            // Construir el request para la API con los datos del flete local
             var request = new FletePersonalRequest
             {
-                // Formateamos la fecha como string (la API espera string según FletePersonalRequest)
-                Fecha = fleteLocal.Fecha?.ToString("yyyy-MM-dd")
-                        ?? DateTime.Now.ToString("yyyy-MM-dd"),
-                Hora = fleteLocal.Hora?.ToString(@"hh\:mm\:ss")
-                       ?? DateTime.Now.TimeOfDay.ToString(@"hh\:mm\:ss"),
+                Fecha = fleteLocal.Fecha?.ToString("yyyy-MM-dd") ?? DateTime.Now.ToString("yyyy-MM-dd"),
+                Hora = fleteLocal.Hora?.ToString(@"hh\:mm\:ss") ?? DateTime.Now.TimeOfDay.ToString(@"hh\:mm\:ss"),
                 ClaveProveedor = fleteLocal.ProvClave ?? string.Empty,
                 IdDestFlete = (int)(fleteLocal.IdDestFlete ?? 0),
                 TipoFlete = fleteLocal.TipoFlete ?? "NORMAL",
@@ -412,272 +449,211 @@ namespace BusCheckInV2.ViewModels
                 Chofer = fleteLocal.Chofer ?? string.Empty
             };
 
-            // Llamada a la API — InsertarFletePersonal devuelve el ID del servidor (long)
-            // Si devuelve -1 o 0, significa que falló
             var serverIdFletePer = await _apiService.InsertarFletePersonal(request);
+            if (serverIdFletePer <= 0)
+                throw new Exception("El servidor rechazó el flete padre.");
 
-            if (serverIdFletePer > 0)
-            {
-                var sw = System.Diagnostics.Stopwatch.StartNew();
-                // Actualizamos el registro local con el ID que nos asignó el servidor
-                // y marcamos como sincronizado
-                fleteLocal.IdFletePer = serverIdFletePer;
-                fleteLocal.IsSynced = true;
-                await _databaseService.UpdateAsync(fleteLocal);
+            fleteLocal.IdFletePer = serverIdFletePer;
+            fleteLocal.IsSynced = true;
+            await _databaseService.UpdateAsync(fleteLocal);
 
-                _serverIdFletePer = serverIdFletePer;
-
-                Console.WriteLine($"[Sync] Flete padre sincronizado. IdFletePer servidor={serverIdFletePer}");
-
-                // CRÍTICO: Actualizar todos los DetFlete de este flete que tienen
-                // el ID local como referencia, para que apunten al ID real del servidor
-                await ActualizarIdFleteEnDetallesAsync(_fleteLocalId, serverIdFletePer);
-                sw.Stop();
-
-                await _databaseService.RegistrarSyncLogAsync(
-                    tipoOperacion: "FLETE_PADRE",
-    idFletePer: serverIdFletePer > 0 ? serverIdFletePer : _fleteLocalId,
-    exitoso: serverIdFletePer > 0,
-    mensaje: serverIdFletePer > 0
-                             ? $"Insertado con Id={serverIdFletePer}"
-                             : "API rechazó el flete",
-    registrosAfectados: 1,
-    duracionMs: (int)sw.ElapsedMilliseconds);
-            }
-            else
-            {
-                Console.WriteLine($"[Sync] API rechazó el flete padre. Respuesta={serverIdFletePer}");
-                throw new Exception("El servidor no pudo insertar el flete padre.");
-            }
-
-
+            _serverIdFletePer = serverIdFletePer;
+            await ActualizarServerIdEnDetallesAsync(_fleteLocalId, serverIdFletePer);
         }
 
-        // ─── Actualiza el IdFletePer en los detalles del servidor ID recibido ─────────
-        private async Task ActualizarIdFleteEnDetallesAsync(int fleteLocalId, long serverIdFletePer)
+        private async Task ActualizarServerIdEnDetallesAsync(int localId, long serverId)
         {
-            // Obtenemos todos los detalles que tienen como referencia el ID local del flete
-            var todosDetalles = await _databaseService.GetItemsAsync<Tb_FlePer_DetFlete>();
+            var detalles = await _databaseService.GetItemsAsync<Tb_FlePer_DetFlete>();
+            var aActualizar = detalles.Where(d => d.FleteLocalId == localId && d.IdFletePer != serverId).ToList();
 
-            // Filtramos los que todavía tienen el ID local (no el del servidor)
-            // Usamos (long)fleteLocalId porque IdFletePer es long? en el modelo
-            var detallesAActualizar = todosDetalles
-                .Where(d => d.IdFletePer == (long)fleteLocalId)
-                .ToList();
-
-            Console.WriteLine($"[Sync] Actualizando {detallesAActualizar.Count} detalles con IdFletePer={serverIdFletePer}");
-
-            foreach (var detalle in detallesAActualizar)
+            foreach (var d in aActualizar)
             {
-                detalle.IdFletePer = serverIdFletePer;
-                await _databaseService.UpdateAsync(detalle);
+                d.IdFletePer = serverId;
+                await _databaseService.UpdateAsync(d);
             }
-        }
-
-        // ─── FASE 2: Sincronizar los detalles (pasajeros escaneados) ─────────────────
-        private async Task SincronizarDetallesAsyncOG()
-        {
-            if (_fleteLocalId == 0) return;
-
-            // Obtenemos el flete actualizado para tener el IdFletePer del servidor
-            var fleteLocal = await _databaseService.GetItemAsync<Tb_FlePer_FletePersonal>(_fleteLocalId);
-
-            // Solo sincronizamos si el padre ya fue sincronizado y tiene ID del servidor
-            if (fleteLocal == null || !fleteLocal.IdFletePer.HasValue || fleteLocal.IdFletePer <= 0)
-            {
-                Console.WriteLine("[Sync] No se sincronizan detalles: flete padre sin IdFletePer");
-                return;
-            }
-
-            var serverIdFletePer = fleteLocal.IdFletePer.Value;
-
-            // Obtenemos todos los detalles de este flete que NO están sincronizados
-            var todosDetalles = await _databaseService.GetItemsAsync<Tb_FlePer_DetFlete>();
-            var detallesPendientes = todosDetalles
-                .Where(d => d.IdFletePer == serverIdFletePer && !d.IsSynced)
-                .ToList();
-
-            Console.WriteLine($"[Sync] Sincronizando {detallesPendientes.Count} detalles pendientes...");
-
-            int sincronizados = 0;
-            int fallidos = 0;
-
-            foreach (var detalle in detallesPendientes)
-            {
-                try
-                {
-                    var request = new DetFleteRequest
-                    {
-                        IdFletePer = (int)serverIdFletePer,
-                        FlePer_CveNomina = detalle.CveNomina ?? 0,
-                        FlePer_Latitud = detalle.Latitud ?? 0,
-                        FlePer_Longitud = detalle.Longitud ?? 0,
-                        FlePer_Fecha = detalle.Fecha ?? DateTime.Now,
-                        FlePer_Nombre = string.Empty // El servidor no lo requiere según el modelo
-                    };
-
-                    var success = await _apiService.InsertarDetFlete(request);
-
-                    if (success)
-                    {
-                        // Marcar como sincronizado en SQLite
-                        detalle.IsSynced = true;
-                        await _databaseService.UpdateAsync(detalle);
-                        sincronizados++;
-                    }
-                    else
-                    {
-                        fallidos++;
-                        Console.WriteLine($"[Sync] Detalle {detalle.Id} rechazado por API");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    fallidos++;
-                    Console.WriteLine($"[Sync] Error sincronizando detalle {detalle.Id}: {ex.Message}");
-                    // Continuamos con el siguiente — no abortamos todo el lote por un fallo
-                }
-            }
-
-            Console.WriteLine($"[Sync] Detalles: {sincronizados} sincronizados, {fallidos} fallidos");
-
-            // Actualizamos el status visual según el resultado
-            if (fallidos > 0)
-                SyncStatus = $"Pendiente ({fallidos} sin sync)";
-            else
-                SyncStatus = "Sincronizado";
         }
 
         private async Task SincronizarDetallesAsync()
         {
             if (_fleteLocalId == 0) return;
 
-            var sw = System.Diagnostics.Stopwatch.StartNew();
-            // El flete padre debe tener ID del servidor
-            var fleteLocal = await _databaseService
-                .GetItemAsync<Tb_FlePer_FletePersonal>(_fleteLocalId);
+            var flete = await _databaseService.GetItemAsync<Tb_FlePer_FletePersonal>(_fleteLocalId);
+            if (flete?.IdFletePer is null or 0) return;
 
-            if (fleteLocal?.IdFletePer is not > 0)
+            var serverIdFletePer = flete.IdFletePer.Value;
+            var detalles = await _databaseService.GetItemsAsync<Tb_FlePer_DetFlete>();
+            var pendientes = detalles.Where(d => d.FleteLocalId == _fleteLocalId && !d.IsSynced).ToList();
+
+            if (!pendientes.Any()) return;
+
+            foreach (var det in pendientes)
             {
-                Console.WriteLine("[Sync] No se sincronizan detalles: padre sin IdFletePer");
-                return;
-            }
-
-            long serverIdFletePer = fleteLocal.IdFletePer!.Value;
-
-            // Obtener todos los detalles pendientes de este flete
-            var todosDetalles = await _databaseService
-                .GetItemsAsync<Tb_FlePer_DetFlete>();
-
-            var pendientes = todosDetalles
-                .Where(d => d.IdFletePer == serverIdFletePer && !d.IsSynced)
-                .ToList();
-
-            if (pendientes.Count == 0)
-            {
-                Console.WriteLine("[Sync] No hay detalles pendientes");
-                return;
-            }
-
-            Console.WriteLine(
-                $"[Sync] Enviando batch de {pendientes.Count} detalles para flete {serverIdFletePer}");
-            // ── NUEVO: Un solo POST con todos los pasajeros ────────────────────────
-            var items = pendientes.Select(d => new DetFleteItemRequest
-            {
-                FlePer_CveNomina = d.CveNomina ?? 0,
-                FlePer_Latitud = d.Latitud ?? 0,
-                FlePer_Longitud = d.Longitud ?? 0,
-                FlePer_Fecha = d.Fecha ?? DateTime.Now,
-                LocalId = d.Id        // Para saber cuáles marcar si hay fallos parciales
-            }).ToList();
-
-            var resultado = await _apiService.SincronizarDetFletesAsync(
-                (int)serverIdFletePer,
-                items);
-
-            if (resultado.Success)
-            {
-                // Marcar como sincronizados todos los que no están en la lista de fallidos
-                foreach (var detalle in pendientes)
+                try
                 {
-                    bool fallo = resultado.LocalIdsFallidos.Contains(detalle.Id);
-                    if (!fallo)
+                    var req = new DetFleteRequest
                     {
-                        detalle.IsSynced = true;
-                        await _databaseService.UpdateAsync(detalle);
+                        IdFletePer = (int)serverIdFletePer,
+                        FlePer_CveNomina = det.CveNomina ?? 0,
+                        FlePer_Latitud = det.Latitud ?? 0,
+                        FlePer_Longitud = det.Longitud ?? 0,
+                        FlePer_Fecha = det.Fecha ?? DateTime.Now,
+
+                        // FIX 2026-06-02 (CRÍTICO encontrado en log):
+                        // El backend tiene [Required] en FlePer_Nombre y
+                        // rechaza con 400 BadRequest si llega null/vacío.
+                        // Log real visto en el dispositivo del usuario:
+                        //   "errors":{"FlePer_Nombre":["The FlePer_Nombre
+                        //    field is required."]}
+                        //   Status: 400 en /InsertarDetFlete
+                        //
+                        // Curiosidad del backend: aunque el campo es
+                        // obligatorio para validación, el SQL de
+                        // InsertarDetFlete IGNORA el valor enviado y hace
+                        // CONCAT(...) desde tb_cat_empleados usando
+                        // @FlePer_CveNomina. O sea: el nombre "real" lo
+                        // calcula la BD; el campo FlePer_Nombre en el
+                        // request es decorativo.
+                        //
+                        // Por eso mandamos un placeholder que pasa la
+                        // validación pero el backend descarta:
+                        //   - Para INICIO/FIN: "INICIO" / "FIN"
+                        //   - Para pasajeros escaneados (det.Nombre == null):
+                        //     "(pendiente)" que la BD sobreescribirá con
+                        //     el nombre real del empleado
+                        FlePer_Nombre = det.CveNomina switch
+                        {
+                            0 => "INICIO",
+                            9999 => "FIN",
+                            _ => string.IsNullOrWhiteSpace(det.Nombre)
+                                ? "(pendiente)"
+                                : det.Nombre
+                        }
+                    };
+
+                    bool success = det.CveNomina switch
+                    {
+                        0 => await _apiService.InsertarInicioDetFlete(req),
+                        9999 => await _apiService.InsertarFinDetFlete(req),
+                        _ => await _apiService.InsertarDetFlete(req)
+                    };
+
+                    if (success)
+                    {
+                        det.IsSynced = true;
+                        await _databaseService.UpdateAsync(det);
                     }
                 }
-
-                int sincronizados = pendientes.Count - resultado.LocalIdsFallidos.Count;
-                Console.WriteLine(
-                    $"[Sync] Batch: {sincronizados} sync, {resultado.LocalIdsFallidos.Count} omitidos");
-
-                SyncStatus = resultado.LocalIdsFallidos.Count > 0
-                    ? $"Pendiente ({resultado.LocalIdsFallidos.Count} sin sync)"
-                    : "Sincronizado";
-
-                await _databaseService.RegistrarSyncLogAsync(
-                    tipoOperacion: "DETALLE_BATCH",
-                    idFletePer: serverIdFletePer,
-                    exitoso: resultado.Success,
-                    mensaje: resultado.Message,
-                    registrosAfectados: resultado.TotalInsertados,
-                    duracionMs: (int)sw.ElapsedMilliseconds);
-
-                sw.Stop();
-            }
-            else
-            {
-                Console.WriteLine($"[Sync] Batch fallido: {resultado.Message}");
-                SyncStatus = "Pendiente (error batch)";
-            }
-        }
-        #endregion
-
-
-        private async Task UpdateTotalPasajerosAsync()
-        {
-            TotalPasajerosText = $"Total: {Pasajeros.Count}";
-            await Task.CompletedTask;
-        }
-
-        private async Task<Location> GetCurrentLocationAsync()
-        {
-            try
-            {
-                var request = new GeolocationRequest(GeolocationAccuracy.Medium, TimeSpan.FromSeconds(8));
-                return await Geolocation.GetLocationAsync(request, _cancellationTokenSource.Token);
-            }
-            catch (Exception ex)
-            {
-                await _alertService.ShowAlertAsync("Error", $"No se pudo obtener ubicación: {ex.Message}");
-                return null;
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[Sync] Detalle {det.Id} error: {ex.Message}");
+                }
             }
         }
 
-        public async Task<bool> TryFinalSyncBeforeExit()
+        // ── Cierre de Viaje ──────────────────────────────────────────────────
+        [RelayCommand]
+        public async Task FinalizarViajeAsync()
         {
-            if (!IsConnected)
-                return false; // No hay conexión, no se puede sincronizar
-
-            try
+            if (IsSyncing)
             {
-                // Cancelar sincronización automática en curso
-                //                _syncCancellationTokenSource?.Cancel();
+                await _alertService.ShowAlertAsync("Espera", "Sincronización en curso. Intenta en un momento.");
+                return;
+            }
 
-                // Esperar un momento para que se cancelen las operaciones en curso
-                await Task.Delay(500);
+            var totalEmpleados = Pasajeros.Count(p => p.CveNomina != 0 && p.CveNomina != 9999);
+            var confirmar = await _alertService.ShowConfirmationAsync("Finalizar Viaje", $"Se registraron {totalEmpleados} pasajeros.\n¿Confirmar cierre del viaje?");
+            if (!confirmar) return;
 
-                // Intentar una sincronización manual final
+            if (!Pasajeros.Any(p => p.CveNomina == 9999))
+            {
+                var loc = await GetCurrentLocationAsync();
+                var fin = new Tb_FlePer_DetFlete
+                {
+                    FleteLocalId = _fleteLocalId,
+                    IdFletePer = _serverIdFletePer > 0 ? _serverIdFletePer : (long)_fleteLocalId,
+                    CveNomina = 9999,
+                    Latitud = loc?.Latitude ?? 0,
+                    Longitud = loc?.Longitude ?? 0,
+                    Fecha = DateTime.Now,
+                    Nombre = "FIN",
+                    IsSynced = false
+                };
+                await _databaseService.InsertAsync(fin);
+                Pasajeros.Add(fin);
+            }
+
+            var fleteLocal = await _databaseService.GetItemAsync<Tb_FlePer_FletePersonal>(_fleteLocalId);
+            if (fleteLocal != null)
+            {
+                fleteLocal.Cantidad = totalEmpleados;
+                fleteLocal.FechaFin = DateTime.Now;
+                await _databaseService.UpdateAsync(fleteLocal);
+            }
+
+            if (IsConnected)
+            {
                 await TrySyncDataAsync();
 
-                // Verificar si quedan operaciones pendientes
-                return !HasPendingSyncOperations;
+                if (_serverIdFletePer > 0)
+                {
+                    try
+                    {
+                        await _apiService.UpdateFletePersonal(new UpdateFleteRequest
+                        {
+                            IdFletePer = (int)_serverIdFletePer,
+                            FlePer_Cantidad = totalEmpleados
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[Finalizar] Error: {ex.Message}");
+                    }
+                }
             }
-            catch (Exception ex)
+
+            var msg = IsConnected
+                ? $"{totalEmpleados} pasajeros registrados y enviados al servidor."
+                : $"{totalEmpleados} pasajeros guardados localmente.";
+
+            await _alertService.ShowAlertAsync("Viaje Finalizado", msg);
+
+            // FIX 2026-06-02: limpiar la preference de "último flete"
+            // porque ESTE viaje ya terminó exitosamente. Si el chofer
+            // reabre la app, no verá el diálogo de "continuar flete"
+            // porque ya no hay nada que continuar.
+            //
+            // Lo limpiamos ANTES del GoBackAsync para que si el usuario
+            // mata la app durante la alerta, la preference ya esté
+            // consistente con el estado real.
+            try
             {
-                Console.WriteLine($"Error en sincronización final: {ex}");
-                return false;
+                Preferences.Remove("ultimo_flete_local_id");
+                Preferences.Remove("ultimo_flete_chofer");
+                Preferences.Remove("ultimo_flete_ruta");
+                Preferences.Remove("ultimo_flete_fecha");
+            }
+            catch { /* ignore: las prefs se limpian en próxima escritura */ }
+
+            await _navigationService.GoBackAsync();
+        }
+
+        // ── Helpers Técnicos ─────────────────────────────────────────────────
+        private void ActualizarTotalPasajeros()
+        {
+            var empleados = Pasajeros.Count(p => p.CveNomina != 0 && p.CveNomina != 9999);
+            TotalPasajerosText = $"Pasajeros: {empleados}";
+        }
+
+        private async Task<Location?> GetCurrentLocationAsync()
+        {
+            try
+            {
+                var req = new GeolocationRequest(GeolocationAccuracy.Medium, TimeSpan.FromSeconds(8));
+                return await Geolocation.GetLocationAsync(req, _cancellationTokenSource.Token);
+            }
+            catch
+            {
+                return null;
             }
         }
 
@@ -685,167 +661,51 @@ namespace BusCheckInV2.ViewModels
         {
             Task.Run(async () =>
             {
-                Console.WriteLine($"[SyncService] Iniciado para flete local {_fleteLocalId}");
-
                 while (!_cancellationTokenSource.Token.IsCancellationRequested)
                 {
                     try
                     {
-                        if (HasPendingSyncOperations && IsConnected)
-                        {
-                            Console.WriteLine("[SyncService] Operaciones pendientes detectadas, sincronizando...");
+                        await Task.Delay(TimeSpan.FromSeconds(SyncIntervalSegundos), _cancellationTokenSource.Token);
+
+                        if (IsConnected && await TienePendientesAsync())
                             await TrySyncDataAsync();
-                        }
-
-                        await Task.Delay(
-                            TimeSpan.FromSeconds(SyncIntervalSeconds),
-                            _cancellationTokenSource.Token);
                     }
-                    catch (TaskCanceledException)
-                    {
-                        // Cancelación limpia: el ViewModel fue dispuesto. Salir del loop.
-                        Console.WriteLine("[SyncService] Cancelado limpiamente.");
-                        break;
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        // Igual que TaskCanceledException en contexto de Task.Delay
-                        Console.WriteLine("[SyncService] OperationCanceled, saliendo.");
-                        break;
-                    }
-                    catch (SQLiteException sqlEx)
-                    {
-                        // Error de SQLite: loggear con detalle y continuar el loop.
-                        // No queremos detener el sync por un error de BD recuperable.
-                        Console.WriteLine(
-                            $"[SyncService] SQLite Error ({sqlEx.HResult}): {sqlEx.Message}");
-
-                        // Espera extra antes de reintentar para no martillar la BD
-                        await SafeDelayAsync(TimeSpan.FromSeconds(30));
-                    }
-                    catch (HttpRequestException httpEx)
-                    {
-                        // Error de red: esperado en modo offline. No es crítico.
-                        Console.WriteLine(
-                            $"[SyncService] Red no disponible: {httpEx.Message}");
-
-                        await SafeDelayAsync(TimeSpan.FromSeconds(SyncIntervalSeconds));
-                    }
+                    catch (OperationCanceledException) { break; }
                     catch (Exception ex)
                     {
-                        // Cualquier otro error: loggear completo para debugging.
-                        // Nunca silenciar — esto es información de producción.
-                        Console.WriteLine(
-                            $"[SyncService] Error inesperado: {ex.GetType().Name}: {ex.Message}");
-                        Console.WriteLine(
-                            $"[SyncService] StackTrace: {ex.StackTrace}");
-
-                        // Actualizar UI para que el operador sepa que algo falló
-                        await MainThread.InvokeOnMainThreadAsync(() =>
-                        {
-                            SyncStatus = "Error en sincronización automática";
-                        });
-
-                        // Espera más larga antes de reintentar para evitar error storm
-                        await SafeDelayAsync(TimeSpan.FromSeconds(60));
+                        Console.WriteLine($"[SyncService] {ex.Message}");
+                        await SafeDelayAsync(TimeSpan.FromSeconds(30));
                     }
                 }
-
-                Console.WriteLine($"[SyncService] Detenido para flete local {_fleteLocalId}");
-
             }, _cancellationTokenSource.Token);
         }
 
-        /// <summary>
-        /// Task.Delay que no lanza si el token ya está cancelado.
-        /// Útil en los catch blocks donde ya capturamos la excepción principal.
-        /// </summary>
         private async Task SafeDelayAsync(TimeSpan delay)
         {
-            try
-            {
-                await Task.Delay(delay, _cancellationTokenSource.Token);
-            }
-            catch (OperationCanceledException) { /* Intencional */ }
-        }
-
-        private async Task TrySyncDataAsyncLEGACY()
-        {
-            if (_isSyncInProgress || !IsConnected) return;
-
-            await _syncSemaphore.WaitAsync();
-            try
-            {
-                _isSyncInProgress = true;
-                IsSyncing = true;
-                IsFinalizarEnabled = false;
-
-                bool success = true;
-                foreach (var op in _pendingOperations)
-                {
-                    try
-                    {
-                        // Procesar operación
-                        _pendingOperations.TryDequeue(out _);
-                    }
-                    catch
-                    {
-                        success = false;
-                    }
-                }
-
-                SyncStatus = success ? "Sincronizado" : "Pendiente";
-            }
-            finally
-            {
-                _isSyncInProgress = false;
-                IsSyncing = false;
-                IsFinalizarEnabled = true;
-                _syncSemaphore.Release();
-            }
-        }
-
-        [RelayCommand]
-        public async Task FinalizarViajeAsync()
-        {
-            if (IsSyncing)
-            {
-                await _alertService.ShowAlertAsync("Advertencia", "Sincronización en curso. Por favor espera.");
-                return;
-            }
-
-            await TrySyncDataAsync();
-            await _alertService.ShowAlertAsync("Viaje finalizado", $"Se registraron {Pasajeros.Count} pasajeros correctamente.");
-            await _navigationService.GoBackAsync();
-        }
-
-        [RelayCommand]
-        public async Task AddManualAsync()
-        {
-            if (string.IsNullOrWhiteSpace(ManualEntryText)) return;
-            await ProcessBarcodeValueAsync(ManualEntryText.Trim());
-            ManualEntryText = string.Empty;
-        }
-
-        partial void OnSearchTextChanged(string value) => FilterPasajeros(value);
-
-        public void FilterPasajeros(string query)
-        {
-            if (string.IsNullOrWhiteSpace(query))
-                Pasajeros = new ObservableCollection<Tb_FlePer_DetFlete>(AllPasajeros);
-            else
-                Pasajeros = new ObservableCollection<Tb_FlePer_DetFlete>(
-                    AllPasajeros.Where(p => p.CveNomina.ToString().Contains(query)));
+            try { await Task.Delay(delay, _cancellationTokenSource.Token); }
+            catch (OperationCanceledException) { }
         }
 
         public override void Dispose()
         {
-            _audioService.Dispose();
+            _cancellationTokenSource.Cancel();
+            _cancellationTokenSource.Dispose();
+            Connectivity.ConnectivityChanged -= OnConnectivityChanged;
+
+            // FIX (2026-06-01): se elimina _audioService.Dispose().
+            // El wrapper IAudioService (SoundPlayer / Plugin.Maui.Audio / etc.)
+            // normalmente se registra como SINGLETON en MauiProgram.cs, porque
+            // reutiliza el SoundPool del sistema. Disponerlo aquí rompe la
+            // siguiente vez que cualquier pantalla reproduzca un beep/error,
+            // lanzando ObjectDisposedException en la próxima sesión de escaneo.
+            // Si IAudioService fuera TRANSIENT, sería seguro disposearlo, pero
+            // ese patrón es raro y debe decidirse explícitamente.
+            // Se deja un _audioService?. referencia por si en el futuro se
+            // quiere liberar buffers; por ahora se omite.
+
             base.Dispose();
         }
-
     }
-
     // Copia esto al final de EscaneoCodigoViewModel.cs
     public static class TaskExtensions
     {

@@ -1,130 +1,148 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:viewmodels="clr-namespace:BusCheckInV2.ViewModels"
-             x:Class="BusCheckInV2.Views.SeleccionDeFlete"
-             Title="Selección de Flete"
-             x:DataType="viewmodels:SeleccionDeFleteViewModel">
+<ContentPage
+    x:Class="BusCheckInV2.Views.SeleccionDeFlete"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:viewmodels="clr-namespace:BusCheckInV2.ViewModels"
+    Title="Selección de Flete"
+    x:DataType="viewmodels:SeleccionDeFleteViewModel">
 
     <ContentPage.ToolbarItems>
-        <ToolbarItem Text="Fletes Pendientes"
-                     IconImageSource="bus_alert.png"
-                     Command="{Binding IrAFletesPendientesCommand}"
-                     Order="Primary"
-                     Priority="0" />
+        <ToolbarItem
+            Command="{Binding IrAFletesPendientesCommand}"
+            IconImageSource="bus_alert.png"
+            Order="Primary"
+            Priority="0"
+            Text="Fletes Pendientes" />
     </ContentPage.ToolbarItems>
 
     <ScrollView>
-        <Grid Padding="7"
-              ColumnSpacing="0"
-              RowSpacing="0"
-              ColumnDefinitions="*,*,*"
-              RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+        <Grid
+            Padding="7"
+            ColumnDefinitions="*,*,*"
+            ColumnSpacing="0"
+            RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto"
+            RowSpacing="0">
             <!--  Logo y versión  -->
-            <Label x:Name="VersionLabel"
-                   Grid.Row="0"
-                   Grid.ColumnSpan="3"
-                   Margin="0,0,0,0"
-                   FontAttributes="Bold"
-                   FontAutoScalingEnabled="True"
-                   FontFamily="AmsiProRegular"
-                   FontSize="11"
-                   HorizontalOptions="End"
-                   Text="{Binding VersionText}" />
-            <Image Grid.Row="0"
-                   Grid.Column="0"
-                   Aspect="AspectFit"
-                   HeightRequest="30"
-                   Source="logogrupou.png" />
-            <Image Grid.Row="0"
-                   Grid.Column="1"
-                   Aspect="AspectFit"
-                   HeightRequest="70"
-                   Source="logomrlucky.png" />
-            <Image Grid.Row="0"
-                   Grid.Column="2"
-                   Aspect="AspectFit"
-                   HeightRequest="30"
-                   Source="logogab.png" />
+            <Label
+                x:Name="VersionLabel"
+                Grid.Row="0"
+                Grid.ColumnSpan="3"
+                Margin="0,0,0,0"
+                FontAttributes="Bold"
+                FontAutoScalingEnabled="True"
+                FontFamily="AmsiProRegular"
+                FontSize="11"
+                HorizontalOptions="End"
+                Text="{Binding VersionText}" />
+            <Image
+                Grid.Row="0"
+                Grid.Column="0"
+                Aspect="AspectFit"
+                HeightRequest="30"
+                Source="logogrupou.png" />
+            <Image
+                Grid.Row="0"
+                Grid.Column="1"
+                Aspect="AspectFit"
+                HeightRequest="70"
+                Source="logomrlucky.png" />
+            <Image
+                Grid.Row="0"
+                Grid.Column="2"
+                Aspect="AspectFit"
+                HeightRequest="30"
+                Source="logogab.png" />
 
             <!--  Proveedor  -->
-            <Label Grid.Row="1"
-                   Grid.ColumnSpan="3"
-                   Margin="0,10,0,5"
-                   Text="Selecciona un Proveedor:"
-                   FontAttributes="Bold" />
-            <Picker Title="Proveedores"
-                    Grid.Row="2"
-                    Grid.ColumnSpan="3"
-                    Margin="0,0,0,15"
-                    ItemsSource="{Binding Proveedores}"
-                    SelectedItem="{Binding SelectedProveedor, Mode=TwoWay}"
-                    ItemDisplayBinding="{Binding ProvNombre}" />
+            <Label
+                Grid.Row="1"
+                Grid.ColumnSpan="3"
+                Margin="0,10,0,5"
+                FontAttributes="Bold"
+                Text="Selecciona un Proveedor:" />
+            <Picker
+                Title="Proveedores"
+                Grid.Row="2"
+                Grid.ColumnSpan="3"
+                Margin="0,0,0,15"
+                ItemDisplayBinding="{Binding ProvNombre}"
+                ItemsSource="{Binding Proveedores}"
+                SelectedItem="{Binding SelectedProveedor, Mode=TwoWay}" />
 
             <!--  Ruta  -->
-            <Label Grid.Row="3"
-                   Grid.ColumnSpan="3"
-                   Margin="0,10,0,5"
-                   Text="Selecciona una Ruta:"
-                   FontAttributes="Bold" />
-            <Picker Title="Rutas"
-                    Grid.Row="4"
-                    Grid.ColumnSpan="3"
-                    Margin="0,0,0,15"
-                    ItemsSource="{Binding Rutas}"
-                    SelectedItem="{Binding SelectedRuta, Mode=TwoWay}"
-                    ItemDisplayBinding="{Binding NomDestFlete}"
-                    IsEnabled="{Binding IsRutaEnabled}" />
+            <Label
+                Grid.Row="3"
+                Grid.ColumnSpan="3"
+                Margin="0,10,0,5"
+                FontAttributes="Bold"
+                Text="Selecciona una Ruta:" />
+            <Picker
+                Title="Rutas"
+                Grid.Row="4"
+                Grid.ColumnSpan="3"
+                Margin="0,0,0,15"
+                IsEnabled="{Binding IsRutaEnabled}"
+                ItemDisplayBinding="{Binding NomDestFlete}"
+                ItemsSource="{Binding Rutas}"
+                SelectedItem="{Binding SelectedRuta, Mode=TwoWay}" />
 
             <!--  Tipo Flete  -->
-            <Label Grid.Row="5"
-                   Grid.ColumnSpan="3"
-                   Margin="0,10,0,5"
-                   Text="Selecciona un Tipo de Flete:"
-                   FontAttributes="Bold" />
-            <Picker Title="Tipos de Flete"
-                    Grid.Row="6"
-                    Grid.ColumnSpan="3"
-                    Margin="0,0,0,15"
-                    ItemsSource="{Binding TipoFleteOptions}"
-                    SelectedItem="{Binding SelectedTipoFlete, Mode=TwoWay}"
-                    IsEnabled="{Binding IsTipoFleteEnabled}" />
+            <Label
+                Grid.Row="5"
+                Grid.ColumnSpan="3"
+                Margin="0,10,0,5"
+                FontAttributes="Bold"
+                Text="Selecciona un Tipo de Flete:" />
+            <Picker
+                Title="Tipos de Flete"
+                Grid.Row="6"
+                Grid.ColumnSpan="3"
+                Margin="0,0,0,15"
+                IsEnabled="{Binding IsTipoFleteEnabled}"
+                ItemsSource="{Binding TipoFleteOptions}"
+                SelectedItem="{Binding SelectedTipoFlete, Mode=TwoWay}" />
 
             <!--  Tipo Viaje  -->
-            <Label Grid.Row="7"
-                   Grid.ColumnSpan="3"
-                   Margin="0,10,0,5"
-                   Text="Selecciona un Tipo de Viaje:"
-                   FontAttributes="Bold" />
-            <Picker Title="Tipos de Viaje"
-                    Grid.Row="8"
-                    Grid.ColumnSpan="3"
-                    Margin="0,0,0,15"
-                    ItemsSource="{Binding TipoViajeOptions}"
-                    SelectedItem="{Binding SelectedTipoViaje, Mode=TwoWay}"
-                    IsEnabled="{Binding IsTipoViajeEnabled}" />
+            <Label
+                Grid.Row="7"
+                Grid.ColumnSpan="3"
+                Margin="0,10,0,5"
+                FontAttributes="Bold"
+                Text="Selecciona un Tipo de Viaje:" />
+            <Picker
+                Title="Tipos de Viaje"
+                Grid.Row="8"
+                Grid.ColumnSpan="3"
+                Margin="0,0,0,15"
+                IsEnabled="{Binding IsTipoViajeEnabled}"
+                ItemsSource="{Binding TipoViajeOptions}"
+                SelectedItem="{Binding SelectedTipoViaje, Mode=TwoWay}" />
 
             <!--  Nombre Chofer  -->
-            <Label Grid.Row="9"
-                   Grid.ColumnSpan="3"
-                   Margin="0,10,0,5"
-                   Text="Nombre del Chofer:"
-                   FontAttributes="Bold" />
-            <Entry Grid.Row="10"
-                   Grid.ColumnSpan="3"
-                   Margin="0,0,0,15"
-                   Placeholder="Ingresa el nombre del chofer"
-                   Text="{Binding NombreChofer}" />
+            <Label
+                Grid.Row="9"
+                Grid.ColumnSpan="3"
+                Margin="0,10,0,5"
+                FontAttributes="Bold"
+                Text="Nombre del Chofer:" />
+            <Entry
+                Grid.Row="10"
+                Grid.ColumnSpan="3"
+                Margin="0,0,0,15"
+                Placeholder="Ingresa el nombre del chofer"
+                Text="{Binding NombreChofer}" />
 
             <!--  Botón Continuar  -->
-            <Button Grid.Row="11"
-                    Grid.ColumnSpan="3"
-                    Margin="0,20,0,0"
-                    Text="Continuar"
-                    Command="{Binding ContinuarCommand}"
-                    IsEnabled="{Binding IsContinuarEnabled}"
-                    CornerRadius="8"
-                    FontAttributes="Bold" />
+            <Button
+                Grid.Row="11"
+                Grid.ColumnSpan="3"
+                Margin="0,20,0,0"
+                Command="{Binding ContinuarCommand}"
+                CornerRadius="8"
+                FontAttributes="Bold"
+                IsEnabled="{Binding IsContinuarEnabled}"
+                Text="Continuar" />
         </Grid>
     </ScrollView>
 </ContentPage>

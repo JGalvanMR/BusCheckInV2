@@ -1,6 +1,7 @@
 ﻿using BusCheckInV2.Constants;
 using BusCheckInV2.Models;
 using Microsoft.Extensions.Logging;
+using Microsoft.Maui.Networking;
 using System;
 using System.Collections.Generic;
 using System.Net.Http;
@@ -282,6 +283,25 @@ namespace BusCheckInV2.Services
     int serverIdFletePer,
     List<DetFleteItemRequest> items)
         {
+            // FIX (2026-06-01): el backend (WSBusCheckInV2Controller.SincronizarDetFletes)
+            // devuelve ApiResponse<DetFletesBatchResult>. El tipo del cliente se
+            // llama DetFletesBatchSyncResult por legado. El wire format (JSON)
+            // depende SOLO de los nombres de propiedad, no del nombre de la
+            // clase, así que el mapeo funciona mientras la clase del cliente
+            // tenga estas propiedades EXACTAS:
+            //
+            //   bool   Success
+            //   int    TotalInsertados
+            //   int    TotalFallidos
+            //   List<int> LocalIdsFallidos
+            //   string Message
+            //
+            // Si en algún momento se renombra la clase o se le quitan/añaden
+            // propiedades, este método dejará de deserializar correctamente.
+            // Acción recomendada (no incluida aquí por no tener acceso a la
+            // definición de DetFletesBatchSyncResult): renombrarla a
+            // DetFletesBatchResult para coincidir 1:1 con el backend, o
+            // agregar un campo [JsonPropertyName("totalInsertados")] explícito.
             var url = GetApiUrl("/SincronizarDetFletes");
 
             var payload = new

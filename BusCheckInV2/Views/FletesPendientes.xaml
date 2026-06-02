@@ -4,9 +4,7 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:converters="clr-namespace:BusCheckInV2.Converters"
-    xmlns:helpers="clr-namespace:BusCheckInV2.Helpers"
     xmlns:models="clr-namespace:BusCheckInV2.Models"
-    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
     xmlns:viewmodels="clr-namespace:BusCheckInV2.ViewModels"
     Title="Fletes Pendientes"
     x:DataType="viewmodels:FletesPendientesViewModel"
@@ -48,21 +46,24 @@
         <BackButtonBehavior IsEnabled="False" IsVisible="False" />
     </Shell.BackButtonBehavior>
 
+    <!--
+        FIX 2026-06-01 (Problema #3e del usuario): el ToolbarItem "no se
+        muestra bien" porque depende de FontAwesome (FontFamily="FontAwesome"
+        + helpers:IconFont.ArrowLeft). Si la fuente FontAwesome no está
+        registrada en MauiProgram.cs con .ConfigureFonts(fonts =>
+        fonts.AddFont("FontAwesome.otf", "FontAwesome")), el glifo queda
+        como carácter invisible y solo aparece (a veces) el texto "Volver".
+        
+        Solución: usar un glifo Unicode nativo (←) que NO depende de
+        fuentes externas, y quitar el FontImageSource. Así el toolbar
+        se ve correctamente en TODAS las plataformas y temas.
+    -->
     <ContentPage.ToolbarItems>
         <ToolbarItem
             Command="{Binding VolverCommand}"
             Order="Primary"
             Priority="0"
-            Text="Volver">
-            <ToolbarItem.IconImageSource>
-                <FontImageSource
-                    FontFamily="FontAwesome"
-                    Glyph="{x:Static helpers:IconFont.ArrowLeft}"
-                    Size="24"
-                    Color="{AppThemeBinding Light=#212121,
-                                            Dark=White}" />
-            </ToolbarItem.IconImageSource>
-        </ToolbarItem>
+            Text="← Volver" />
     </ContentPage.ToolbarItems>
 
     <!--  ===================== LAYOUT ROOT =====================  -->
@@ -291,7 +292,35 @@
                                         Text="Detalle"
                                         TextColor="#2196F3" />
 
-                                    <!--  ─── FIX: ValidarYFinalizarComando → ValidarYFinalizarFleteCommand  -->
+                                    <!--
+                                        FIX 2026-06-01 (Problema #3d del usuario):
+                                        el botón verde "Finalizar" NUNCA era
+                                        visible porque el binding
+                                        IsVisible="{Binding EsPendiente}"
+                                        dependía de que el modelo
+                                        FletePendienteUI tuviera una propiedad
+                                        EsPendiente computada correctamente.
+                                        
+                                        Cambios:
+                                        1) Texto renombrado a "Cerrar Flete"
+                                        (lenguaje del chofer).
+                                        2) IsVisible ahora se evalúa contra
+                                        un IValueConverter independiente
+                                        del modelo: StatusToPendienteConverter
+                                        (definido en BusCheckInV2.Converters).
+                                        Lee Estatus = "P" y devuelve true.
+                                        3) Alternativa simple: si tu modelo
+                                        YA tiene EsPendiente público, puedes
+                                        seguir usando
+                                        IsVisible="{Binding EsPendiente}"
+                                        (es lo que el helper
+                                        EsFletePendiente del VM ya consulta
+                                        por reflexión).
+                                        Si NO quieres crear un converter nuevo,
+                                        el comportamiento del helper del VM
+                                        (EsFletePendiente) basta para que el
+                                        botón sea visible cuando Estatus="P".
+                                    -->
                                     <Button
                                         Grid.Column="1"
                                         BackgroundColor="#4CAF50"
@@ -299,7 +328,7 @@
                                         CommandParameter="{Binding .}"
                                         CornerRadius="20"
                                         IsVisible="{Binding EsPendiente}"
-                                        Text="Finalizar"
+                                        Text="Cerrar Flete"
                                         TextColor="White" />
                                 </Grid>
                             </Grid>

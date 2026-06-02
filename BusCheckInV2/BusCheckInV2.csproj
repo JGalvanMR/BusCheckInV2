@@ -36,6 +36,7 @@
 		<AndroidSigningKeyAlias>GABIRA</AndroidSigningKeyAlias>
 		<AndroidSigningKeyPass>GABIRA</AndroidSigningKeyPass>
 		<ApplicationVersion>20</ApplicationVersion>
+		<AndroidUseAapt2>True</AndroidUseAapt2>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net9.0-android|AnyCPU'">
@@ -44,11 +45,13 @@
 		<AndroidSigningKeyAlias>GABIRA</AndroidSigningKeyAlias>
 		<AndroidSigningKeyPass>GABIRA</AndroidSigningKeyPass>
 		<ApplicationVersion>20</ApplicationVersion>
+		<EmbedAssembliesIntoApk>True</EmbedAssembliesIntoApk>
+		<AndroidUseAapt2>True</AndroidUseAapt2>
 	</PropertyGroup>
 
 	<ItemGroup>
 		<!-- App Icon -->
-		<MauiIcon Include="Resources\AppIcon\launcher.png" />
+		<MauiIcon Include="Resources\AppIcon\appicons.png" />
 
 		<!-- Splash Screen -->
 		<MauiSplashScreen Include="Resources\Splash\splash.png" Color="#FFFFFF" />
@@ -75,6 +78,10 @@
 
 	<ItemGroup>
 	  <Compile Remove="Services\ApiFleteServiceReal.cs" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <None Remove="Resources\AppIcon\appicons.png" />
 	</ItemGroup>
 
 	<ItemGroup>
