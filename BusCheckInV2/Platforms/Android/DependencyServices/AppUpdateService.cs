@@ -34,7 +34,7 @@ namespace BusCheckInV2.Platforms.Android.Services
         public async Task<bool> IsUpdateAvailableAsync()
         {
             // URL del servicio que proporciona la última versión
-            var url = "http://189.206.160.206:81/EmbarquesApk/BusCheckIn/version.txt";
+            var url = "http://189.206.160.206:81/EmbarquesApk/BusCheckInV2/version.txt";
 
             try
             {

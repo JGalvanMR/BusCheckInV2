@@ -27,7 +27,7 @@ namespace BusCheckInV2.Services.Sync
                     await _syncService.SyncDataAsync();
                 }
 
-                await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken); // Espera 5 minutos entre sincronizaciones
+                await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken); // Espera 5 minutos entre sincronizaciones
             }
         }
     }

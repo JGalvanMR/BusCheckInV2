@@ -1,9 +1,7 @@
 ﻿using BusCheckInV2.Models;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Linq.Expressions;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace BusCheckInV2.Services
@@ -16,29 +14,43 @@ namespace BusCheckInV2.Services
         Task<int> DeleteAsync<T>(T item) where T : class;
         Task<List<T>> GetItemsAsync<T>() where T : class, new();
         Task<T> GetItemAsync<T>(int id) where T : class, new();
-        Task ClearAllTablesAsync();
+        //Task ClearAllTablesAsync();
+        Task<ClearTablesResult> ClearAllTablesAsync(bool forceDelete = false);
 
-        // ← NUEVO MÉTODO: Elimina items que cumplan una condición lambda
+        // ✅ CORREGIDO: Añadir 'new()' OBLIGATORIO para sqlite-net-pcl
         Task<int> DeleteByPredicateAsync<T>(Expression<Func<T, bool>> predicate) where T : class, new();
 
-        // NUEVOS MÉTODOS para fletes pendientes
+        // Fletes
         Task<List<FletePendienteUI>> ObtenerFletesPendientesAsync(string chofer = null, int diasAtras = 3);
         Task<List<string>> ObtenerChoferesUnicosAsync();
         Task<bool> ActualizarEstadoFleteAsync(int idFleteLocal, string nuevoEstatus, int? cantidadReal = null, string observaciones = null);
         Task<int> InsertarDetalleFleteAsync(int idFletePer, int cveNomina, double latitud, double longitud, string nombre);
 
-
-        #region METODOS DE SINCRONIZACIÓN
-        // Nuevos métodos para sincronización
+        // Sincronización
         Task<List<Tb_FlePer_FletePersonal>> ObtenerFletesNoSincronizadosAsync();
         Task<bool> ExisteFleteAsync(int idFletePer);
         Task MarcarComoSincronizadoAsync(int idFletePer);
         Task<int> SincronizarConApiAsync(IApiFleteService apiService);
 
-        // Métodos para caché
+        // Cache
         Task<List<FletePendienteUI>> ObtenerFletesPendientesDesdeCacheAsync(string chofer, int dias);
         Task<bool> GuardarFleteEnCacheAsync(FleteApi flete);
         Task LimpiarCacheAsync();
-        #endregion
+
+
+        /// <summary>Registra una entrada en el log de sincronización.</summary>
+        Task RegistrarSyncLogAsync(
+            string tipoOperacion,
+            long? idFletePer,
+            bool exitoso,
+            string mensaje,
+            int registrosAfectados = 0,
+            int duracionMs = 0);
+
+        /// <summary>Devuelve los últimos N registros del log (para pantalla de diagnóstico).</summary>
+        Task<List<Tb_Sync_Log>> ObtenerSyncLogAsync(int ultimos = 50);
+
+        /// <summary>Limpia entradas de log más antiguas que N días.</summary>
+        Task LimpiarSyncLogAntiguoAsync(int diasRetencion = 7);
     }
 }

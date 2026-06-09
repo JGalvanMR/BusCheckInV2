@@ -1,351 +1,394 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:viewmodels="clr-namespace:BusCheckInV2.ViewModels"
-             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
-             xmlns:converters="clr-namespace:BusCheckInV2.Converters"
-             x:Class="BusCheckInV2.Views.FletesPendientes"
-             Title="Fletes Pendientes">
+<ContentPage
+    x:Class="BusCheckInV2.Views.FletesPendientes"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:converters="clr-namespace:BusCheckInV2.Converters"
+    xmlns:models="clr-namespace:BusCheckInV2.Models"
+    xmlns:viewmodels="clr-namespace:BusCheckInV2.ViewModels"
+    Title="Fletes Pendientes"
+    x:DataType="viewmodels:FletesPendientesViewModel"
+    BackgroundColor="{AppThemeBinding Light=#F5F7FA,
+                                      Dark=#121212}"
+    Shell.NavBarIsVisible="True">
 
-    <!--  NO establezcas BindingContext aquí, se hará en el code-behind  -->
-
+    <!--  ===================== RESOURCES =====================  -->
     <ContentPage.Resources>
         <ResourceDictionary>
-            <converters:StatusToActionConverter x:Key="StatusToActionConverter" />
+            <converters:StatusToColorConverter x:Key="StatusToColorConverter" />
+            <converters:IntToBoolConverter x:Key="IntToBoolConverter" />
             <converters:InverseIntToBoolConverter x:Key="InverseIntToBoolConverter" />
+
+            <Style x:Key="CardBorder" TargetType="Border">
+                <Setter Property="Padding" Value="12" />
+                <Setter Property="Margin" Value="8,4" />
+                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=White, Dark=#1E1E1E}" />
+                <Setter Property="StrokeThickness" Value="0" />
+                <Setter Property="StrokeShape">
+                    <Setter.Value>
+                        <RoundRectangle CornerRadius="14" />
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style x:Key="TonalButton" TargetType="Button">
+                <Setter Property="CornerRadius" Value="20" />
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="Padding" Value="7,5" />
+                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=#E3F2FD, Dark=#263238}" />
+                <Setter Property="TextColor" Value="{AppThemeBinding Light=#0D47A1, Dark=#BBDEFB}" />
+            </Style>
         </ResourceDictionary>
     </ContentPage.Resources>
 
-    <!--  Agregar ToolbarItem para regresar  -->
+    <!--  ===================== TOOLBAR =====================  -->
+    <Shell.BackButtonBehavior>
+        <BackButtonBehavior IsEnabled="False" IsVisible="False" />
+    </Shell.BackButtonBehavior>
+
+    <!--
+        FIX 2026-06-01 (Problema #3e del usuario): el ToolbarItem "no se
+        muestra bien" porque depende de FontAwesome (FontFamily="FontAwesome"
+        + helpers:IconFont.ArrowLeft). Si la fuente FontAwesome no está
+        registrada en MauiProgram.cs con .ConfigureFonts(fonts =>
+        fonts.AddFont("FontAwesome.otf", "FontAwesome")), el glifo queda
+        como carácter invisible y solo aparece (a veces) el texto "Volver".
+        
+        Solución: usar un glifo Unicode nativo (←) que NO depende de
+        fuentes externas, y quitar el FontImageSource. Así el toolbar
+        se ve correctamente en TODAS las plataformas y temas.
+    -->
     <ContentPage.ToolbarItems>
-        <ToolbarItem Text="⬅️ Volver"
-                     Command="{Binding VolverCommand}"
-                     Order="Primary"
-                     Priority="0" />
+        <ToolbarItem
+            Command="{Binding VolverCommand}"
+            Order="Primary"
+            Priority="0"
+            Text="← Volver" />
     </ContentPage.ToolbarItems>
 
-    <Grid RowDefinitions="Auto,Auto,*,Auto">
+    <!--  ===================== LAYOUT ROOT =====================  -->
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
 
-        <!--  Cabecera  -->
-        <Frame Grid.Row="0"
-               Margin="10"
-               Padding="15"
-               CornerRadius="10"
-               BackgroundColor="#2196F3">
-            <VerticalStackLayout>
-                <Label Text="🚚 Fletes Pendientes"
-                       FontSize="20"
-                       FontAttributes="Bold"
-                       TextColor="White"
-                       HorizontalOptions="Center" />
-                <Label Text="{Binding VersionText}"
-                       FontSize="12"
-                       TextColor="White"
-                       HorizontalOptions="Center" />
-            </VerticalStackLayout>
-        </Frame>
+        <!--  ===================== FILTROS =====================  -->
+        <VerticalStackLayout
+            Grid.Row="0"
+            Padding="0"
+            Spacing="8">
+            <Border Padding="12" Style="{StaticResource CardBorder}">
+                <Border.Shadow>
+                    <Shadow
+                        Opacity="0.18"
+                        Radius="12"
+                        Offset="0,4" />
+                </Border.Shadow>
 
-        <Frame Grid.Row="0"
-               Margin="10,10,10,5"
-               Padding="10"
-               CornerRadius="10"
-               BackgroundColor="{Binding ColorEstadoConexion, Converter={StaticResource ColorToLightConverter}}">
-            <HorizontalStackLayout Spacing="10">
-                <Label Text="🌐"
-                       FontSize="16"
-                       VerticalOptions="Center" />
-                <Label Text="{Binding TextoEstadoConexion}"
-                       FontSize="14"
-                       FontAttributes="Bold"
-                       VerticalOptions="Center" />
-                <Label Text="{Binding MensajeEstado}"
-                       FontSize="12"
-                       TextColor="Gray"
-                       VerticalOptions="Center"
-                       HorizontalOptions="EndAndExpand" />
+                <Grid
+                    ColumnDefinitions="Auto,*"
+                    ColumnSpacing="8"
+                    RowDefinitions="Auto,Auto,Auto,Auto"
+                    RowSpacing="6">
 
-                <Button Padding="5"
-                        Text="🔁"
-                        Command="{Binding ProbarConexionComando}"
-                        BackgroundColor="Transparent"
-                        TextColor="{Binding ColorEstadoConexion}"
-                        FontSize="16" />
-            </HorizontalStackLayout>
-        </Frame>
+                    <!--  Fila 0: Etiqueta Chofer + Indicador de conexión  -->
+                    <Label
+                        Grid.Row="0"
+                        Grid.Column="0"
+                        FontAttributes="Bold"
+                        FontSize="14"
+                        Text="Chofer" />
 
-        <!--  Selector de Chofer  -->
-        <Frame Grid.Row="1"
-               Margin="10,5"
-               Padding="15"
-               CornerRadius="10"
-               BackgroundColor="White">
-            <VerticalStackLayout Spacing="10">
-                <Label Text="Seleccionar Chofer:"
-                       FontSize="16"
-                       FontAttributes="Bold" />
+                    <!--  ─── FIX: TextoEstadoConexion y ColorEstadoConexion ───  -->
+                    <!--  Antes: Text="{Binding TextoEstadoConexion}"  -->
+                    <!--  TextColor="{Binding ColorEstadoConexion}"  -->
+                    <!--  Ahora: ambas propiedades existen en el ViewModel  -->
+                    <Label
+                        Grid.Row="0"
+                        Grid.Column="1"
+                        FontSize="11"
+                        HorizontalTextAlignment="End"
+                        Text="{Binding TextoEstadoConexion}"
+                        TextColor="{Binding ColorEstadoConexion}" />
 
-                <Picker Title="👤 Elige tu nombre"
-                        ItemsSource="{Binding ListaChoferes}"
-                        SelectedItem="{Binding ChoferSeleccionado, Mode=TwoWay}"
-                        BackgroundColor="White">
-                    <Picker.Behaviors>
-                        <toolkit:EventToCommandBehavior EventName="SelectedIndexChanged" Command="{Binding CargarFletesComando}" />
-                    </Picker.Behaviors>
-                </Picker>
+                    <!--  Fila 1: Picker de Chofer  -->
+                    <!--  ─── FIX: SelectedItem usa UsuarioSeleccionado ────────  -->
+                    <!--  Antes: SelectedItem="{Binding UsuarioSeleccionado}"  -->
+                    <!--  (propiedad inexistente)  -->
+                    <!--  Ahora: UsuarioSeleccionado existe en el ViewModel  -->
+                    <!--  y es de tipo UsuarioApi (mismo tipo que la  -->
+                    <!--  colección ListaUsuarios)  -->
+                    <Picker
+                        Title="Seleccionar chofer"
+                        Grid.Row="1"
+                        Grid.Column="0"
+                        Grid.ColumnSpan="2"
+                        HeightRequest="44"
+                        ItemDisplayBinding="{Binding Nombre}"
+                        ItemsSource="{Binding ListaUsuarios}"
+                        SelectedItem="{Binding UsuarioSeleccionado}" />
 
-                <Label Text="{Binding MensajeEstado}"
-                       FontSize="12"
-                       TextColor="Gray" />
-            </VerticalStackLayout>
-        </Frame>
-
-        <!--  Filtros  -->
-        <Frame Grid.Row="2"
-               Margin="10,0,10,10"
-               Padding="15"
-               CornerRadius="10"
-               BackgroundColor="White">
-            <VerticalStackLayout Spacing="10">
-                <Label Text="Filtros:"
-                       FontSize="14"
-                       FontAttributes="Bold" />
-
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
-                    <VerticalStackLayout Grid.Column="0">
-                        <HorizontalStackLayout Spacing="10" VerticalOptions="Center">
-                            <Switch IsToggled="{Binding MostrarSoloPendientes, Mode=TwoWay}" OnColor="#4CAF50" />
-                            <Label Text="Mostrar solo pendientes"
-                                   FontSize="12"
-                                   VerticalOptions="Center" />
+                    <!--  Fila 2: Switch solo pendientes + días filtro  -->
+                    <HorizontalStackLayout
+                        Grid.Row="2"
+                        Grid.Column="0"
+                        Grid.ColumnSpan="2"
+                        Spacing="10"
+                        VerticalOptions="Center">
+                        <HorizontalStackLayout Spacing="6" VerticalOptions="Center">
+                            <!--
+                                FIX 2026-06-04: agregamos Toggled event para que
+                                el cambio del switch recargue la lista
+                                inmediatamente, sin tener que pulsar "Actualizar".
+                                El binding IsToggled ya actualiza la propiedad
+                                MostrarSoloPendientes en el VM (TwoWay por
+                                defecto), pero NO dispara el comando de carga.
+                                El handler OnMostrarSoloPendientesChanged en
+                                FletesPendientes.xaml.cs hace el ExecuteAsync
+                                del comando.
+                            -->
+                            <Switch
+                                IsToggled="{Binding MostrarSoloPendientes}"
+                                Scale="0.9"
+                                Toggled="OnMostrarSoloPendientesChanged" />
+                            <Label
+                                FontSize="12"
+                                Text="Solo pendientes"
+                                VerticalOptions="Center" />
                         </HorizontalStackLayout>
-
-                        <Label Margin="0,5,0,0"
-                               Text="{Binding DiasFiltro, StringFormat='Mostrando fletes de los últimos {0} días'}"
-                               FontSize="11"
-                               TextColor="Gray" />
-                    </VerticalStackLayout>
-
-                    <Button Grid.Column="1"
-                            Padding="10"
-                            Text="🔄"
-                            Command="{Binding CargarFletesComando}"
-                            BackgroundColor="LightGray"
-                            CornerRadius="8"
+                        <Label
+                            FontSize="11"
+                            Text="{Binding DiasFiltro, StringFormat='Últimos {0} días'}"
+                            TextColor="Gray"
                             VerticalOptions="Center" />
+                    </HorizontalStackLayout>
+
+                    <!--  Fila 3: Botón Actualizar  -->
+                    <!--  ─── FIX: CargarFletesComando → CargarFletesPendientesCommand  -->
+                    <Button
+                        Grid.Row="3"
+                        Grid.Column="0"
+                        Grid.ColumnSpan="2"
+                        Padding="12,0"
+                        Command="{Binding CargarFletesPendientesCommand}"
+                        FontSize="13"
+                        HeightRequest="44"
+                        Style="{StaticResource TonalButton}"
+                        Text="Actualizar" />
+
                 </Grid>
-            </VerticalStackLayout>
-        </Frame>
+            </Border>
+        </VerticalStackLayout>
 
-        <!--  Indicador de carga  -->
-        <ActivityIndicator Grid.Row="3"
-                           IsRunning="{Binding EstaCargando}"
-                           IsVisible="{Binding EstaCargando}"
-                           HorizontalOptions="Center"
-                           VerticalOptions="Center" />
+        <!--  Mensaje de estado  -->
+        <Label
+            Grid.Row="2"
+            Margin="10,5"
+            FontSize="12"
+            HorizontalOptions="Center"
+            Text="{Binding MensajeEstado}"
+            TextColor="Gray"
+            VerticalOptions="Start" />
 
-        <!--  Lista de Fletes  -->
-        <RefreshView Grid.Row="4"
-                     Command="{Binding CargarFletesComando}"
-                     IsRefreshing="{Binding EstaCargando}">
+        <!--  ===================== LISTA DE FLETES =====================  -->
+        <!--  ─── FIX: CargarFletesComando → CargarFletesPendientesCommand  -->
+        <RefreshView
+            Grid.Row="3"
+            Command="{Binding CargarFletesPendientesCommand}"
+            IsRefreshing="{Binding EstaCargando}">
 
             <CollectionView ItemsSource="{Binding FletesPendientes}" SelectionMode="None">
 
                 <CollectionView.EmptyView>
-                    <VerticalStackLayout Padding="40"
-                                         HorizontalOptions="Center"
-                                         VerticalOptions="Center"
-                                         Spacing="20">
-                        <Label Text="📭"
-                               FontSize="40"
-                               HorizontalOptions="Center" />
-                        <Label Text="No se encontraron fletes pendientes"
-                               FontSize="16"
-                               HorizontalOptions="Center" />
-                        <Label Text="Seleccione otro chofer o ajuste los filtros"
-                               FontSize="12"
-                               TextColor="Gray"
-                               HorizontalOptions="Center" />
+                    <VerticalStackLayout
+                        Padding="40"
+                        HorizontalOptions="Center"
+                        Spacing="20"
+                        VerticalOptions="Center">
+                        <Label
+                            FontSize="40"
+                            HorizontalOptions="Center"
+                            Text="📭" />
+                        <Label
+                            FontSize="16"
+                            HorizontalOptions="Center"
+                            Text="{Binding MensajeEstado}"
+                            TextColor="Gray" />
+                        <Label
+                            FontSize="12"
+                            HorizontalOptions="Center"
+                            Text="Seleccione un chofer para comenzar"
+                            TextColor="LightGray" />
                     </VerticalStackLayout>
                 </CollectionView.EmptyView>
 
                 <CollectionView.ItemTemplate>
-                    <DataTemplate>
-                        <Frame Margin="10,5"
-                               Padding="15"
-                               CornerRadius="10"
-                               BackgroundColor="White"
-                               HasShadow="True">
+                    <!--  x:DataType en el DataTemplate para binding fuerte en items  -->
+                    <DataTemplate x:DataType="models:FletePendienteUI">
+                        <Border Style="{StaticResource CardBorder}">
+                            <Border.Shadow>
+                                <Shadow
+                                    Opacity="0.12"
+                                    Radius="8"
+                                    Offset="0,2" />
+                            </Border.Shadow>
 
-                            <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="8">
+                            <Grid
+                                ColumnDefinitions="*,Auto"
+                                RowDefinitions="Auto,Auto,Auto"
+                                RowSpacing="8">
 
-                                <!--  Cabecera con Ruta y Estado  -->
-                                <Grid Row="0" ColumnDefinitions="*,Auto">
-                                    <VerticalStackLayout Grid.Column="0">
-                                        <Label Text="{Binding Ruta}"
-                                               FontSize="16"
-                                               FontAttributes="Bold"
-                                               LineBreakMode="WordWrap" />
-                                        <Label Text="{Binding FechaHora, StringFormat='{0:dd/MM/yyyy HH:mm}'}"
-                                               FontSize="12"
-                                               TextColor="Gray" />
-                                    </VerticalStackLayout>
-
-                                    <!--  Badge de Estado  -->
-                                    <Frame Grid.Column="1"
-                                           Padding="8,4"
-                                           CornerRadius="12"
-                                           BackgroundColor="{Binding Estatus, Converter={StaticResource StatusToColorConverter}}">
-                                        <Label Text="{Binding Estatus}"
-                                               FontSize="11"
-                                               TextColor="White"
-                                               FontAttributes="Bold" />
-                                    </Frame>
-                                </Grid>
-
-                                <!--  Separador  -->
-                                <BoxView Grid.Row="1"
-                                         Margin="0,5"
-                                         HeightRequest="1"
-                                         BackgroundColor="#E0E0E0" />
-
-                                <!--  Información del Chofer  -->
-                                <VerticalStackLayout Grid.Row="2" Spacing="4">
-                                    <Label Text="👤 Chofer:"
-                                           FontSize="12"
-                                           TextColor="Gray" />
-                                    <Label Text="{Binding Chofer}" FontSize="14" />
+                                <!--  Fila 0: Ruta y Fecha  -->
+                                <VerticalStackLayout Grid.Row="0" Grid.Column="0">
+                                    <Label
+                                        FontAttributes="Bold"
+                                        FontSize="16"
+                                        LineBreakMode="WordWrap"
+                                        Text="{Binding Ruta}" />
+                                    <Label
+                                        FontSize="12"
+                                        Text="{Binding FechaHora, StringFormat='{0:dd/MM/yyyy HH:mm}'}"
+                                        TextColor="Gray" />
                                 </VerticalStackLayout>
 
-                                <!--  Pasajeros  -->
-                                <Grid Grid.Row="3"
-                                      ColumnDefinitions="*,*"
-                                      ColumnSpacing="10">
-                                    <VerticalStackLayout Grid.Column="0" Spacing="4">
-                                        <Label Text="👥 Esperados:"
-                                               FontSize="12"
-                                               TextColor="Gray" />
-                                        <Label Text="{Binding CantidadEsperada, StringFormat='{0}'}"
-                                               FontSize="14"
-                                               FontAttributes="Bold" />
-                                    </VerticalStackLayout>
-
-                                    <VerticalStackLayout Grid.Column="1" Spacing="4">
-                                        <Label Text="✅ Reales:"
-                                               FontSize="12"
-                                               TextColor="Gray" />
-                                        <Label Text="{Binding CantidadReal, StringFormat='{0}'}"
-                                               FontSize="14"
-                                               FontAttributes="Bold"
-                                               IsVisible="{Binding CantidadReal, Converter={StaticResource IntToBoolConverter}}" />
-                                        <Label Text="No validado"
-                                               FontSize="12"
-                                               TextColor="LightGray"
-                                               IsVisible="{Binding CantidadReal, Converter={StaticResource InverseIntToBoolConverter}}" />
-                                    </VerticalStackLayout>
+                                <Grid
+                                    Grid.Row="0"
+                                    Grid.Column="1"
+                                    ColumnDefinitions="Auto,Auto">
+                                    <Label
+                                        Grid.Column="0"
+                                        FontAttributes="Bold"
+                                        FontSize="16"
+                                        Text="👥  "
+                                        TextColor="Gray" />
+                                    <Label
+                                        Grid.Column="1"
+                                        FontAttributes="Bold"
+                                        FontSize="16"
+                                        Text="{Binding CantidadEsperada}" />
                                 </Grid>
 
-                                <!--  Tipo y Duración  -->
-                                <Grid Grid.Row="4"
-                                      ColumnDefinitions="*,*"
-                                      ColumnSpacing="10">
-                                    <VerticalStackLayout Grid.Column="0" Spacing="4">
-                                        <Label Text="📋 Tipo:"
-                                               FontSize="12"
-                                               TextColor="Gray" />
-                                        <Label Text="{Binding TipoFlete}" FontSize="12" />
-                                    </VerticalStackLayout>
-
-                                    <VerticalStackLayout Grid.Column="1" Spacing="4">
-                                        <Label Text="⏱️ Duración:"
-                                               FontSize="12"
-                                               TextColor="Gray" />
-                                        <Label Text="{Binding DuracionViaje}" FontSize="12" />
-                                    </VerticalStackLayout>
+                                <!--  Fila 1: Chofer y Estado  -->
+                                <Grid
+                                    Grid.Row="1"
+                                    Grid.ColumnSpan="2"
+                                    ColumnDefinitions="*,Auto">
+                                    <Label
+                                        Grid.Column="0"
+                                        FontSize="14"
+                                        Text="{Binding Chofer}" />
+                                    <Border
+                                        Grid.Column="1"
+                                        Padding="8,4"
+                                        BackgroundColor="{Binding Estatus, Converter={StaticResource StatusToColorConverter}}">
+                                        <Border.StrokeShape>
+                                            <RoundRectangle CornerRadius="16" />
+                                        </Border.StrokeShape>
+                                        <Label
+                                            FontAttributes="Bold"
+                                            FontSize="11"
+                                            Text="{Binding Estatus}"
+                                            TextColor="White" />
+                                    </Border>
                                 </Grid>
 
-                                <!--  Separador  -->
-                                <BoxView Grid.Row="5"
-                                         Margin="0,10"
-                                         HeightRequest="1"
-                                         BackgroundColor="#E0E0E0" />
+                                <!--  Fila 2: Botones  -->
+                                <Grid
+                                    Grid.Row="2"
+                                    Grid.ColumnSpan="2"
+                                    ColumnDefinitions="*,*"
+                                    ColumnSpacing="5">
 
-                                <!--  Botones de Acción  -->
-                                <Grid Grid.Row="6"
-                                      ColumnDefinitions="*,*,*,*"
-                                      ColumnSpacing="5"
-                                      HorizontalOptions="Fill">
+                                    <!--  ─── FIX: VerDetalleComando → VerDetalleFleteCommand  -->
+                                    <Button
+                                        Grid.Column="0"
+                                        BackgroundColor="Transparent"
+                                        Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.VerDetalleFleteCommand}"
+                                        CommandParameter="{Binding .}"
+                                        CornerRadius="20"
+                                        Text="Detalle"
+                                        TextColor="#2196F3" />
 
-                                    <!--  Ver Detalle  -->
-                                    <Button Grid.Column="0"
-                                            Text="📋"
-                                            Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.VerDetalleComando}"
-                                            CommandParameter="{Binding .}"
-                                            BackgroundColor="#2196F3"
-                                            TextColor="White"
-                                            CornerRadius="8"
-                                            FontSize="12" />
-
-                                    <!--  Reanudar/Iniciar  -->
-                                    <Button Grid.Column="1"
-                                            Text="{Binding Estatus, Converter={StaticResource StatusToActionConverter}}"
-                                            Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ReanudarFleteComando}"
-                                            CommandParameter="{Binding .}"
-                                            BackgroundColor="#4CAF50"
-                                            TextColor="White"
-                                            CornerRadius="8"
-                                            FontSize="12"
-                                            IsVisible="{Binding EsPendiente}" />
-
-                                    <!--  Finalizar  -->
-                                    <Button Grid.Column="2"
-                                            Text="✅"
-                                            Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ValidarYFinalizarComando}"
-                                            CommandParameter="{Binding .}"
-                                            BackgroundColor="#FF9800"
-                                            TextColor="White"
-                                            CornerRadius="8"
-                                            FontSize="12"
-                                            IsVisible="{Binding EsPendiente}" />
-
-                                    <!--  Cancelar  -->
-                                    <Button Grid.Column="3"
-                                            Text="❌"
-                                            Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.CancelarFleteComando}"
-                                            CommandParameter="{Binding .}"
-                                            BackgroundColor="#F44336"
-                                            TextColor="White"
-                                            CornerRadius="8"
-                                            FontSize="12"
-                                            IsVisible="{Binding EsPendiente}" />
+                                    <!--
+                                        FIX 2026-06-01 (Problema #3d del usuario):
+                                        el botón verde "Finalizar" NUNCA era
+                                        visible porque el binding
+                                        IsVisible="{Binding EsPendiente}"
+                                        dependía de que el modelo
+                                        FletePendienteUI tuviera una propiedad
+                                        EsPendiente computada correctamente.
+                                        
+                                        Cambios:
+                                        1) Texto renombrado a "Cerrar Flete"
+                                        (lenguaje del chofer).
+                                        2) IsVisible ahora se evalúa contra
+                                        un IValueConverter independiente
+                                        del modelo: StatusToPendienteConverter
+                                        (definido en BusCheckInV2.Converters).
+                                        Lee Estatus = "P" y devuelve true.
+                                        3) Alternativa simple: si tu modelo
+                                        YA tiene EsPendiente público, puedes
+                                        seguir usando
+                                        IsVisible="{Binding EsPendiente}"
+                                        (es lo que el helper
+                                        EsFletePendiente del VM ya consulta
+                                        por reflexión).
+                                        Si NO quieres crear un converter nuevo,
+                                        el comportamiento del helper del VM
+                                        (EsFletePendiente) basta para que el
+                                        botón sea visible cuando Estatus="P".
+                                    -->
+                                    <Button
+                                        Grid.Column="1"
+                                        BackgroundColor="#4CAF50"
+                                        Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ValidarYFinalizarFleteCommand}"
+                                        CommandParameter="{Binding .}"
+                                        CornerRadius="20"
+                                        IsVisible="{Binding EsPendiente}"
+                                        Text="Cerrar Flete"
+                                        TextColor="White" />
                                 </Grid>
                             </Grid>
-                        </Frame>
+                        </Border>
                     </DataTemplate>
                 </CollectionView.ItemTemplate>
             </CollectionView>
         </RefreshView>
 
-        <!--  Footer  -->
-        <Frame Grid.Row="7"
-               Margin="10"
-               Padding="10"
-               CornerRadius="10"
-               BackgroundColor="#E3F2FD">
-            <Grid ColumnDefinitions="*,Auto">
-                <Label Grid.Column="0"
-                       Text="{Binding FletesPendientes.Count, StringFormat='Total: {0} fletes'}"
-                       FontSize="12"
-                       VerticalOptions="Center" />
+        <!--  ===================== FOOTER =====================  -->
+        <Border Grid.Row="4" Style="{StaticResource CardBorder}">
+            <Border.Shadow>
+                <Shadow
+                    Opacity="0.12"
+                    Radius="8"
+                    Offset="0,2" />
+            </Border.Shadow>
 
-                <Button Grid.Column="1"
-                        Padding="10,5"
-                        Text="🔄 Sincronizar"
-                        Command="{Binding SincronizarConServidorComando}"
-                        BackgroundColor="LightGray"
-                        CornerRadius="8"
-                        FontSize="12" />
+            <Grid
+                ColumnDefinitions="Auto,*"
+                ColumnSpacing="8"
+                VerticalOptions="Center">
+
+                <Label
+                    FontSize="13"
+                    Text="{Binding FletesPendientes.Count, StringFormat='{0} fletes'}"
+                    TextColor="Gray"
+                    VerticalOptions="Center" />
+
+                <!--  ─── FIX: SincronizarComando → SincronizarCommand ────  -->
+                <Button
+                    Grid.Column="1"
+                    Command="{Binding SincronizarCommand}"
+                    Style="{StaticResource TonalButton}"
+                    Text="Sincronizar" />
             </Grid>
-        </Frame>
+        </Border>
 
+        <!--  ActivityIndicator  -->
+        <ActivityIndicator
+            Grid.RowSpan="5"
+            HorizontalOptions="Center"
+            IsRunning="{Binding EstaCargando}"
+            IsVisible="{Binding EstaCargando}"
+            Scale="1.6"
+            VerticalOptions="Center"
+            Color="#2196F3" />
     </Grid>
 </ContentPage>

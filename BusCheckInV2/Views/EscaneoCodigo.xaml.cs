@@ -1,440 +1,113 @@
-using AndroidX.Lifecycle;
-using BarcodeScanning;
 using BusCheckInV2.ViewModels;
 using Microsoft.Maui.Controls;
-using System;
-using System.Threading.Tasks;
-using static Android.App.Assist.AssistStructure;
 
-namespace BusCheckInV2.Views
+namespace BusCheckInV2.Views;
+
+public partial class EscaneoCodigo : ContentPage
 {
-    public partial class EscaneoCodigo : ContentPage
+    // FIX 2026-06-01 (Problema #2 del usuario): cuando el usuario elige
+    // "Salir de todas formas" en el diálogo de pendientes, se setea este
+    // flag para que la próxima navegación NO se vuelva a cancelar.
+    private bool _permitirSalida;
+
+    public EscaneoCodigo(EscaneoCodigoViewModel viewModel)
     {
-        private CameraView _cameraView;
-        private readonly EscaneoCodigoViewModel _viewModel;
-        private bool _isCameraInitialized = false;
-        public EscaneoCodigo(EscaneoCodigoViewModel viewModel)
+        InitializeComponent();
+        BindingContext = viewModel;
+    }
+
+    protected override async void OnAppearing()
+    {
+        base.OnAppearing();
+
+        // CRÍTICO PARA V3: Solicita el permiso nativo de la cámara antes
+        // de inicializar la lógica.
+        await BarcodeScanning.Methods.AskForRequiredPermissionAsync();
+
+        // Suscribimos al evento de navegación de Shell para interceptar
+        // tanto el botón "Atrás" de Android como cualquier GoToAsync("..")
+        // que intente sacar al usuario sin sincronizar.
+        Shell.Current.Navigating += OnShellNavigating;
+
+        if (BindingContext is EscaneoCodigoViewModel vm)
+            await vm.InitializeAsync();
+    }
+
+    protected override void OnDisappearing()
+    {
+        base.OnDisappearing();
+        Shell.Current.Navigating -= OnShellNavigating;
+    }
+
+    private async void OnShellNavigating(object sender, ShellNavigatingEventArgs e)
+    {
+        if (_permitirSalida) return;
+
+        // Solo nos interesa cuando se está yendo hacia atrás (pop) o al root
+        if (e.Source != ShellNavigationSource.Pop &&
+            e.Source != ShellNavigationSource.PopToRoot)
+            return;
+
+        if (BindingContext is not EscaneoCodigoViewModel vm)
+            return;
+
+        int pendientes = await vm.ContarPendientesSyncAsync();
+        if (pendientes <= 0) return; // todo sincronizado, dejar salir
+
+        // Hay pendientes: cancelar la navegación y mostrar opciones
+        e.Cancel();
+
+        var opcion = await DisplayActionSheet(
+            $"Tienes {pendientes} registro(s) sin sincronizar con el servidor.\n\n" +
+            $"Si sales ahora podrían perderse cuando cambies de teléfono, " +
+            $"se cierre la app o se desinstale.",
+            "Quedarme aquí",                  // opción 1 (cancelar)
+            null,                              // destruction (no queremos)
+            "Reintentar sincronización",      // opción 2
+            "Salir de todas formas");         // opción 3
+
+        if (opcion == "Reintentar sincronización")
         {
-            try
+            await vm.IntentarSincronizarAsync();
+
+            // Re-evaluar después del intento
+            pendientes = await vm.ContarPendientesSyncAsync();
+            if (pendientes <= 0)
             {
-                InitializeComponent();
-                _viewModel = viewModel;
-                BindingContext = viewModel;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error en constructor: {ex}");
-                throw;
-            }
-        }
-
-        private void InitializeCamera()
-        {
-            try
-            {
-                if (_cameraView != null) return;
-
-                _cameraView = new CameraView
-                {
-                    AimMode = true,
-                    BarcodeSymbologies = BarcodeFormats.Code39 | BarcodeFormats.QRCode, // SOLO Code39 para mejor performance
-                    CaptureQuality = CaptureQuality.Low, // CALIDAD BAJA para máxima velocidad
-                    ForceInverted = false,
-                    TapToFocusEnabled = false, // DESACTIVAR para mejor performance
-                    VibrationOnDetected = true, // DESACTIVAR vibración
-                    ViewfinderMode = true,
-                    TorchOn = false,
-                    HorizontalOptions = LayoutOptions.FillAndExpand,
-                    VerticalOptions = LayoutOptions.FillAndExpand,
-                    BackgroundColor = Colors.Black
-                };
-
-                _cameraView.OnDetectionFinished += OnBarcodeDetected;
-
-                _cameraView.SetBinding(CameraView.CameraEnabledProperty,
-                    new Binding(nameof(EscaneoCodigoViewModel.IsScanning), source: _viewModel));
-                _cameraView.SetBinding(CameraView.TorchOnProperty,
-                    new Binding(nameof(EscaneoCodigoViewModel.IsTorchOn), source: _viewModel));
-
-                CameraContainer.Children.Insert(0, _cameraView);
-                _isCameraInitialized = true;
-
-                Console.WriteLine("Cámara inicializada correctamente");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error inicializando cámara: {ex}");
-                _isCameraInitialized = false;
-            }
-        }
-
-        private void CrearCameraView()
-        {
-            if (_cameraView != null)
-            {
-                CameraContainer.Children.Remove(_cameraView);
-                _cameraView = null;
-                _cameraView.IsEnabled = false;  // Detiene escaneo y torch
-                _cameraView.CameraEnabled = false;  // Desactiva cámara nativa
-                _cameraView.TorchOn = false;  // Apaga flash si está encendido
-            }
-
-            _cameraView = new CameraView
-            {
-                AimMode = true,
-                BarcodeSymbologies = BarcodeFormats.Code39 | BarcodeFormats.QRCode,
-                CaptureQuality = CaptureQuality.Highest,
-                ForceInverted = false,
-                TapToFocusEnabled = false,
-                VibrationOnDetected = true,
-                ViewfinderMode = true,
-                TorchOn = false,
-                HorizontalOptions = LayoutOptions.FillAndExpand,
-                VerticalOptions = LayoutOptions.FillAndExpand,
-                BackgroundColor = Colors.Black
-            };
-
-            // Configurar eventos en lugar de bindings para mayor control
-            _cameraView.OnDetectionFinished += OnBarcodeDetected;
-
-            // Bindings directos al ViewModel
-            _cameraView.SetBinding(CameraView.CameraEnabledProperty, new Binding(nameof(EscaneoCodigoViewModel.IsScanning), source: _viewModel));
-            _cameraView.SetBinding(CameraView.TorchOnProperty, new Binding(nameof(EscaneoCodigoViewModel.IsTorchOn), source: _viewModel));
-
-            // Añadimos al contenedor
-            CameraContainer.Children.Insert(0, _cameraView);
-        }
-
-        private async void OnBarcodeDetected(object sender, OnDetectionFinishedEventArg e)
-        {
-            if (e?.BarcodeResults == null || e.BarcodeResults.Count == 0)
-                return;
-
-            try
-            {
-                await _viewModel.ProcessBarcodeResultsAsync(e.BarcodeResults);
-            }
-            catch (Exception ex)
-            {
-                // En caso de error fatal, detener escaneo y mostrar alerta
-                _viewModel.IsScanning = false;
-                DisplayAlert("Error", $"Error en escáner: {ex.Message}", "OK");
-                return;
-            }
-
-        }
-
-        #region Ciclo de Vida
-        protected override async void OnAppearing()
-        {
-            base.OnAppearing();
-
-            try
-            {
-                // Inicializar ViewModel PRIMERO
-                await _viewModel.InitializeAsync();
-
-                // Inicializar cámara SOLO si no está inicializada
-                if (!_isCameraInitialized)
-                {
-                    InitializeCamera();
-                }
-
-                // Activar escaneo después de un breve delay
-                await Task.Delay(500);
-                _viewModel.IsScanning = true;
-            }
-            catch (Exception ex)
-            {
-                await DisplayAlert("Error", $"Error al inicializar: {ex.Message}", "OK");
-            }
-        }
-
-        protected override void OnDisappearing()
-        {
-            base.OnDisappearing();
-
-            try
-            {
-                // Desactivar escaneo PERO NO LIBERAR CÁMARA completamente
-                _viewModel.IsScanning = false;
-                _viewModel.IsTorchOn = false;
-
-                // Solo desactivar cámara, no liberar recursos
-                if (_cameraView != null)
-                {
-                    _cameraView.CameraEnabled = false;
-                }
-
-                // Cleanup del ViewModel (pero no demasiado agresivo si hay datos pendientes)
-                if (_viewModel.HasPendingSyncOperations)
-                {
-                    // Solo limpiar recursos no críticos, mantener datos pendientes
-                    _viewModel.CleanupNonCriticalResources();
-                }
-                else
-                {
-                    // Limpiar completamente
-                    _viewModel.Cleanup();
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error en OnDisappearing: {ex}");
-            }
-        }
-        private void LiberarCameraCompletamente()
-        {
-            try
-            {
-                if (_cameraView != null)
-                {
-                    _cameraView.OnDetectionFinished -= OnBarcodeDetected;
-                    _cameraView.CameraEnabled = false;
-                    _cameraView.TorchOn = false;
-
-                    if (CameraContainer.Children.Contains(_cameraView))
-                    {
-                        CameraContainer.Children.Remove(_cameraView);
-                    }
-
-                    _cameraView = null;
-                    _isCameraInitialized = false;
-
-                    Console.WriteLine("Cámara liberada completamente");
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error liberando cámara: {ex}");
-                _cameraView = null;
-                _isCameraInitialized = false;
-            }
-        }
-        // SOLO liberar cámara completamente cuando sea absolutamente necesario
-        public void ForceCleanup()
-        {
-            LiberarCameraCompletamente();
-            _viewModel.Cleanup();
-        }
-        private void LiberarCamera()
-        {
-            if (_cameraView != null)
-            {
-                // Remover evento primero
-                _cameraView.OnDetectionFinished -= OnBarcodeDetected;
-
-                // Deshabilitar cámara
-                _cameraView.CameraEnabled = false;
-                _cameraView.TorchOn = false;
-                _cameraView.IsEnabled = false;
-
-                // Remover de UI y liberar
-                CameraContainer.Children.Remove(_cameraView);
-                _cameraView = null;
-            }
-        }
-        private void ContentPage_Unloaded(object sender, EventArgs e)
-        {
-            // Si es necesario, desconecta handlers específicos de UI
-            //LiberarCamera();
-        }
-
-        protected override bool OnBackButtonPressed()
-        {
-            try
-            {
-                // Manejo síncrono inmediato - no podemos usar await aquí
-                if (_viewModel.IsSyncing)
-                {
-                    // Usar BeginInvokeOnMainThread para operaciones async sin bloquear
-                    Device.BeginInvokeOnMainThread(async () =>
-                    {
-                        await DisplayAlert(
-                            "Sincronización en curso",
-                            "No puedes salir mientras se están sincronizando datos. Espera a que termine la sincronización.",
-                            "Entendido");
-                    });
-                    return true; // Bloquear retroceso
-                }
-
-                // Si hay datos pendientes, manejar de forma asíncrona
-                if (_viewModel.HasPendingSyncOperations)
-                {
-                    Device.BeginInvokeOnMainThread(async () =>
-                    {
-                        await HandleBackButtonWithPendingData();
-                    });
-                    return true; // Bloquear temporalmente, la lógica async decidirá después
-                }
-
-                // Si hay pasajeros pero está todo sincronizado
-                if (_viewModel.Pasajeros?.Count > 0)
-                {
-                    Device.BeginInvokeOnMainThread(async () =>
-                    {
-                        await HandleBackButtonWithPassengers();
-                    });
-                    return true; // Bloquear temporalmente
-                }
-
-                // No hay datos, permitir salida inmediata
-                return false;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error en OnBackButtonPressed: {ex}");
-                // En caso de error, bloquear por seguridad
-                return true;
-            }
-        }
-
-        private async Task HandleBackButtonWithPendingData()
-        {
-            var result = await DisplayAlert(
-                "Datos pendientes de sincronizar",
-                $"Tienes {_viewModel.Pasajeros.Count} pasajeros registrados que no se han sincronizado completamente. " +
-                "¿Estás seguro de que quieres salir? Los datos se guardaron localmente y se sincronizarán después.",
-                "Sí, salir",
-                "No, esperar");
-
-            if (result)
-            {
-                // Usuario confirmó salir - intentar sincronización final rápida
-                await HandleExitWithPendingData();
-
-                // Navegar de regreso programáticamente
-                await Shell.Current.Navigation.PopModalAsync();
-            }
-        }
-
-        private async Task HandleBackButtonWithPassengers()
-        {
-            var result = await DisplayAlert(
-                "Viaje en progreso",
-                "Tienes pasajeros registrados. ¿Estás seguro de que quieres salir sin finalizar el viaje? " +
-                "Puedes continuar más tarde.",
-                "Sí, salir",
-                "No, continuar");
-
-            if (result)
-            {
-                // Navegar de regreso programáticamente
-                await Shell.Current.Navigation.PopModalAsync();
-            }
-        }
-
-        private async Task HandleExitWithPendingData()
-        {
-            try
-            {
-                // Mostrar indicador de progreso
-                var loadingAlert = DisplayAlert(
-                    "Sincronizando...",
-                    "Guardando datos pendientes antes de salir.",
-                    "Esperar");
-
-                // Intentar una sincronización rápida final
-                var syncTask = _viewModel.TryFinalSyncBeforeExit();
-
-                // Esperar máximo 5 segundos para la sincronización (más corto para UX)
-                var completedTask = await Task.WhenAny(syncTask, Task.Delay(5000));
-
-                await loadingAlert; // Cerrar el alert anterior
-
-                if (completedTask == syncTask && await syncTask)
-                {
-                    await DisplayAlert("Éxito", "Datos sincronizados correctamente.", "OK");
-                }
-                else
-                {
-                    await DisplayAlert(
-                        "Advertencia",
-                        "No se pudieron sincronizar todos los datos. Los datos se guardaron localmente.",
-                        "Entendido");
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error en sincronización final: {ex}");
-                await DisplayAlert(
-                    "Información",
-                    "Los datos se guardaron localmente. Se sincronizarán automáticamente cuando haya conexión.",
-                    "Entendido");
-            }
-        }
-
-        private async Task HandleExitWithPendingDataOG()
-        {
-            try
-            {
-                // Mostrar indicador de progreso
-                var loadingTask = DisplayAlert(
-                    "Sincronizando...",
-                    "Guardando datos pendientes antes de salir.",
-                    "Esperar");
-
-                // Intentar una sincronización rápida final
-                var syncTask = _viewModel.TryFinalSyncBeforeExit();
-
-                // Esperar máximo 10 segundos para la sincronización
-                var completedTask = await Task.WhenAny(syncTask, Task.Delay(10000));
-
-                if (completedTask == syncTask && await syncTask)
-                {
-                    await loadingTask; // Cerrar el alert anterior
-                    await DisplayAlert(
-                        "Éxito",
-                        "Datos sincronizados correctamente. Puedes salir.",
-                        "OK");
-                }
-                else
-                {
-                    await loadingTask; // Cerrar el alert anterior
-                    await DisplayAlert(
-                        "Advertencia",
-                        "No se pudieron sincronizar todos los datos. Los datos se guardaron localmente y se sincronizarán cuando haya conexión.",
-                        "Entendido");
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error en sincronización final: {ex}");
-                await DisplayAlert(
-                    "Información",
-                    "Los datos se guardaron localmente. Se sincronizarán automáticamente cuando haya conexión.",
-                    "Entendido");
-            }
-        }
-        #endregion
-
-        #region UI y Barcode
-        private void OnSearchTextChanged(object sender, TextChangedEventArgs e)
-        {
-            if (BindingContext is EscaneoCodigoViewModel vm)
-            {
-                vm.FilterPasajeros(e.NewTextValue);
-            }
-        }
-        private async void OnAgregarManualClicked(object sender, EventArgs e)
-        {
-            if (BindingContext is EscaneoCodigoViewModel vm && !string.IsNullOrWhiteSpace(ManualEntry.Text))
-            {
-                try
-                {
-                    await vm.ProcessBarcodeAsync(ManualEntry.Text);
-                    // Solo limpiar si fue exitoso (ahora se maneja en el ViewModel)
-                }
-                catch (Exception ex)
-                {
-                    await DisplayAlert("Error", $"Error al agregar manualmente: {ex.Message}", "OK");
-                }
+                _permitirSalida = true;
+                await Shell.Current.GoToAsync("..");
             }
             else
             {
-                await DisplayAlert("Error", "Ingrese un código válido", "OK");
+                await DisplayAlert("Aún hay pendientes",
+                    $"Quedan {pendientes} registro(s) sin sincronizar. " +
+                    $"Verifica tu conexión a internet o espera unos minutos " +
+                    $"y vuelve a intentar.",
+                    "OK");
             }
         }
-        #endregion
+        else if (opcion == "Salir de todas formas")
+        {
+            var confirmar = await DisplayAlert(
+                "¿Seguro?",
+                $"Se perderán {pendientes} registro(s) si no se sincronizan " +
+                $"antes de cerrar la app o cambiar de dispositivo.\n\n" +
+                $"¿Salir de todas formas?",
+                "Sí, salir",
+                "No, quedarme");
+
+            if (confirmar)
+            {
+                _permitirSalida = true;
+                await Shell.Current.GoToAsync("..");
+            }
+        }
+        // "Quedarme aquí" o null (back gesture): no hacer nada, ya cancelamos e
+    }
+
+    private void ContentPage_Unloaded(object sender, EventArgs e)
+    {
+        if (BindingContext is EscaneoCodigoViewModel vm)
+            vm.Dispose();
     }
 }

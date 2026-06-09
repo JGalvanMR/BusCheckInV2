@@ -1,8 +1,8 @@
-﻿using Android.Widget;
-using BusCheckInV2.Models;
+﻿using BusCheckInV2.Models;
 using CommunityToolkit.Maui.Alerts;
 using CommunityToolkit.Maui.Core;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using SQLite;
 using System;
 using System.Collections.Generic;
@@ -11,13 +11,16 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
 using Toast = CommunityToolkit.Maui.Alerts.Toast;
+using System.Threading;
 
 namespace BusCheckInV2.Services
 {
     public class SQLiteService : ISQLiteService
     {
         private SQLiteAsyncConnection _database;
-        private readonly ILogger<ApiFleteServiceReal> _logger;
+        private readonly ILogger<SQLiteService> _logger;
+        private readonly SemaphoreSlim _initLock = new SemaphoreSlim(1, 1);
+        private bool _initialized;
         // Constantes para configuración (best practice de Microsoft Learn)
         private const string DatabaseFilename = "BusCheckInV2.db3";
         private const SQLiteOpenFlags Flags =
@@ -27,9 +30,43 @@ namespace BusCheckInV2.Services
 
         private string DatabasePath => Path.Combine(FileSystem.AppDataDirectory, DatabaseFilename);
 
-        public SQLiteService() { } // Constructor vacío; inicialización lazy en InitializeAsync
+        // ─── CAMBIO 2: Constructor con logger opcional ────────────────────────
+        // El parámetro es opcional (default null) para mantener compatibilidad
+        // con cualquier lugar que construya SQLiteService directamente.
+        // Cuando se resuelve desde DI, el contenedor inyecta ILogger<SQLiteService>
+        // automáticamente porque AddLogging() ya registra loggers genéricos.
+        // NullLogger.Instance es un logger que no hace nada — nunca lanza excepciones.
+        public SQLiteService(ILogger<SQLiteService> logger = null)
+        {
+            // Si DI no inyecta logger (o si se construye manualmente), usamos NullLogger
+            // NullLogger.Instance implementa ILogger y sus métodos son no-ops seguros
+            _logger = logger ?? NullLogger<SQLiteService>.Instance;
+        }
 
         public async Task InitializeAsync()
+        {
+            if (_initialized) return; // fast path sin lock
+
+            await _initLock.WaitAsync();
+            try
+            {
+                if (_initialized) return; // double-check dentro del lock
+
+                _database = new SQLiteAsyncConnection(DatabasePath, Flags);
+                await CreateTablesAsync();
+                await _database.EnableWriteAheadLoggingAsync();
+                await SeedDataAsync();
+                _initialized = true;
+
+                _logger.LogInformation("SQLiteService inicializado en: {Path}", DatabasePath);
+            }
+            finally
+            {
+                _initLock.Release();
+            }
+        }
+
+        public async Task InitializeAsyncLEGACY()
         {
             try
             {
@@ -39,9 +76,16 @@ namespace BusCheckInV2.Services
                 await CreateTablesAsync();
                 await _database.EnableWriteAheadLoggingAsync(); // Habilita WAL para concurrency (recomendado en .NET 9+)
                 await SeedDataAsync();
+
+                // ─── NUEVO: Ahora sí podemos loggear correctamente ─────────
+                _logger.LogInformation("SQLiteService inicializado en: {Path}", DatabasePath);
+                // ────────────────────────────────────────────────────────────
             }
             catch (Exception ex)
             {
+                // ─── CAMBIO: Log antes del toast para que quede en Debug Output
+                _logger.LogCritical(ex, "Fallo crítico al inicializar SQLiteService");
+                // ────────────────────────────────────────────────────────────
                 var toast = Toast.Make($"Error al inicializar la base de datos: {ex.Message}", ToastDuration.Long);
                 await toast.Show();
             }
@@ -55,6 +99,7 @@ namespace BusCheckInV2.Services
             await _database.CreateTableAsync<Tb_FlePer_FletePersonal>();
             await _database.CreateTableAsync<Tb_FlePer_ProvRuta>();
             await _database.CreateTableAsync<Tb_FlePer_Ruta>();
+            await _database.CreateTableAsync<Tb_Sync_Log>();
             // Agrega más tablas si es necesario
         }
 
@@ -63,33 +108,33 @@ namespace BusCheckInV2.Services
         {
             await InsertInitialDataIfNeededAsync(new List<Tb_Cat_Proveedor>
             {
-                new Tb_Cat_Proveedor { prov_clave = "TURISTICOS", prov_nombre = "JUAN CARLOS ACOSTA CABRERA" },
-                new Tb_Cat_Proveedor { prov_clave = "10810", prov_nombre = "RIVERA MONTESINO MARGARITA JACQUELINE" },
-                new Tb_Cat_Proveedor { prov_clave = "RAMIROGE", prov_nombre = "RAMIRO GARCIA ESTRADA" }
+                new Tb_Cat_Proveedor { ProvClave = "TURISTICOS", ProvNombre = "JUAN CARLOS ACOSTA CABRERA" },
+                new Tb_Cat_Proveedor { ProvClave = "10810", ProvNombre = "RIVERA MONTESINO MARGARITA JACQUELINE" },
+                new Tb_Cat_Proveedor { ProvClave = "RAMIROGE", ProvNombre = "RAMIRO GARCIA ESTRADA" }
                 // Otros proveedores
             });
 
             await InsertInitialDataIfNeededAsync(new List<Tb_FlePer_Ruta>
             {
-                new Tb_FlePer_Ruta { IdDestFlete = 1, NomDestFlete = "Yostiro", FleteCant = 4, FleteCosto = 900.00, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
-                new Tb_FlePer_Ruta { IdDestFlete = 2, NomDestFlete = "Carrizal - Peñuelas", FleteCant = 4, FleteCosto = 825.00, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
-                new Tb_FlePer_Ruta { IdDestFlete = 3, NomDestFlete = "4ta Brigada", FleteCant = 2, FleteCosto = 530.00, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
-                new Tb_FlePer_Ruta { IdDestFlete = 4, NomDestFlete = "Estanco - La Mesa", FleteCant = 2, FleteCosto = 530.00, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
-                new Tb_FlePer_Ruta { IdDestFlete = 5, NomDestFlete = "Doña Rosa - San Vicente", FleteCant = 2, FleteCosto = 550.00, DestStatus = "B", RutaCupo = 20, RutaVehiculo = "CAMIONETA" },
-                new Tb_FlePer_Ruta { IdDestFlete = 6, NomDestFlete = "Soledad", FleteCant = 0, FleteCosto = 530.00, DestStatus = "B", RutaCupo = 38, RutaVehiculo = "CAMION" },
-                new Tb_FlePer_Ruta { IdDestFlete = 7, NomDestFlete = "Zona Centro", FleteCant = 0, FleteCosto = 530.00, DestStatus = "B", RutaCupo = 0, RutaVehiculo = "" },
-                new Tb_FlePer_Ruta { IdDestFlete = 8, NomDestFlete = "Tomelopitos", FleteCant = 2, FleteCosto = 530.00, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
-                new Tb_FlePer_Ruta { IdDestFlete = 9, NomDestFlete = "Cardenas", FleteCant = 2, FleteCosto = 530.00, DestStatus = "A", RutaCupo = 20, RutaVehiculo = "CAMIONETA" },
-                new Tb_FlePer_Ruta { IdDestFlete = 10, NomDestFlete = "Oreja - Mocha", FleteCant = 4, FleteCosto = 530.00, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
-                new Tb_FlePer_Ruta { IdDestFlete = 11, NomDestFlete = "Mendoza Temascatio", FleteCant = 2, FleteCosto = 530.00, DestStatus = "A", RutaCupo = 38, RutaVehiculo = "CAMION" },
-                new Tb_FlePer_Ruta { IdDestFlete = 12, NomDestFlete = "San Cayetano - Apatzingan", FleteCant = 2, FleteCosto = 530.00, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMIONETA" },
-                new Tb_FlePer_Ruta { IdDestFlete = 13, NomDestFlete = "Purísima - Malvas", FleteCant = 1, FleteCosto = 530.00, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMIONETA" },
-                new Tb_FlePer_Ruta { IdDestFlete = 14, NomDestFlete = "San Juan - Nicolas", FleteCant = 4, FleteCosto = 650.00, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMIONETA" },
-                new Tb_FlePer_Ruta { IdDestFlete = 15, NomDestFlete = "Soledad - Centro", FleteCant = 2, FleteCosto = 1150.00, DestStatus = "A", RutaCupo = 38, RutaVehiculo = "CAMION" },
-                new Tb_FlePer_Ruta { IdDestFlete = 16, NomDestFlete = "LIMPIEZA NOCTURNA", FleteCant = 2, FleteCosto = 530.00, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
-                new Tb_FlePer_Ruta { IdDestFlete = 17, NomDestFlete = "LOMA DE FLORES", FleteCant = 2, FleteCosto = 530.00, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
-                new Tb_FlePer_Ruta { IdDestFlete = 18, NomDestFlete = "LOMA DE FLORES - MENDOZA", FleteCant = 2, FleteCosto = 530.00, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
-                new Tb_FlePer_Ruta { IdDestFlete = 19, NomDestFlete = "Cardenas-DoñaRosa-San Vicente", FleteCant = 2, FleteCosto = 1100.00, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" }
+                new Tb_FlePer_Ruta { IdDestFlete = 1, NomDestFlete = "Yostiro", FleteCant = 4, FleteCosto = 900.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 2, NomDestFlete = "Carrizal - Peñuelas", FleteCant = 4, FleteCosto = 825.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 3, NomDestFlete = "4ta Brigada", FleteCant = 2, FleteCosto = 530.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 4, NomDestFlete = "Estanco - La Mesa", FleteCant = 2, FleteCosto = 530.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 5, NomDestFlete = "Doña Rosa - San Vicente", FleteCant = 2, FleteCosto = 550.00m, DestStatus = "B", RutaCupo = 20, RutaVehiculo = "CAMIONETA" },
+                new Tb_FlePer_Ruta { IdDestFlete = 6, NomDestFlete = "Soledad", FleteCant = 0, FleteCosto = 530.00m, DestStatus = "B", RutaCupo = 38, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 7, NomDestFlete = "Zona Centro", FleteCant = 0, FleteCosto = 530.00m, DestStatus = "B", RutaCupo = 0, RutaVehiculo = "" },
+                new Tb_FlePer_Ruta { IdDestFlete = 8, NomDestFlete = "Tomelopitos", FleteCant = 2, FleteCosto = 530.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 9, NomDestFlete = "Cardenas", FleteCant = 2, FleteCosto = 530.00m, DestStatus = "A", RutaCupo = 20, RutaVehiculo = "CAMIONETA" },
+                new Tb_FlePer_Ruta { IdDestFlete = 10, NomDestFlete = "Oreja - Mocha", FleteCant = 4, FleteCosto = 530.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 11, NomDestFlete = "Mendoza Temascatio", FleteCant = 2, FleteCosto = 530.00m, DestStatus = "A", RutaCupo = 38, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 12, NomDestFlete = "San Cayetano - Apatzingan", FleteCant = 2, FleteCosto = 530.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMIONETA" },
+                new Tb_FlePer_Ruta { IdDestFlete = 13, NomDestFlete = "Purísima - Malvas", FleteCant = 1, FleteCosto = 530.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMIONETA" },
+                new Tb_FlePer_Ruta { IdDestFlete = 14, NomDestFlete = "San Juan - Nicolas", FleteCant = 4, FleteCosto = 650.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMIONETA" },
+                new Tb_FlePer_Ruta { IdDestFlete = 15, NomDestFlete = "Soledad - Centro", FleteCant = 2, FleteCosto = 1150.00m, DestStatus = "A", RutaCupo = 38, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 16, NomDestFlete = "LIMPIEZA NOCTURNA", FleteCant = 2, FleteCosto = 530.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 17, NomDestFlete = "LOMA DE FLORES", FleteCant = 2, FleteCosto = 530.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 18, NomDestFlete = "LOMA DE FLORES - MENDOZA", FleteCant = 2, FleteCosto = 530.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 19, NomDestFlete = "Cardenas-DoñaRosa-San Vicente", FleteCant = 2, FleteCosto = 1100.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" }
                 // Otros rutas
             });
 
@@ -158,24 +203,64 @@ namespace BusCheckInV2.Services
         }
 
         // Método para limpiar todas las tablas
-        public async Task ClearAllTablesAsync()
+        // ============================================================
+        //  ARCHIVO: BusCheckInV2/Services/SQLiteService.cs
+        //  INSTRUCCIÓN: Reemplaza el método ClearAllTablesAsync completo.
+        // ============================================================
+
+        public async Task<ClearTablesResult> ClearAllTablesAsync(bool forceDelete = false)
         {
             try
             {
+                // ── GUARDIA: verificar pendientes antes de borrar ──────────────────
+                // Esta verificación es la diferencia entre perder datos de producción
+                // y mantenerlos seguros. NUNCA se omite sin forceDelete explícito.
+                if (!forceDelete)
+                {
+                    var pendientesFletes = await _database
+                        .Table<Tb_FlePer_FletePersonal>()
+                        .Where(f => !f.IsSynced)
+                        .CountAsync();
+
+                    var pendientesDetalles = await _database
+                        .Table<Tb_FlePer_DetFlete>()
+                        .Where(d => !d.IsSynced)
+                        .CountAsync();
+
+                    int totalPendientes = pendientesFletes + pendientesDetalles;
+
+                    if (totalPendientes > 0)
+                    {
+                        _logger.LogWarning(
+                            "ClearAllTablesAsync bloqueado: {Total} registros sin sync " +
+                            "({Fletes} fletes, {Detalles} detalles)",
+                            totalPendientes, pendientesFletes, pendientesDetalles);
+
+                        return ClearTablesResult.Rejected(totalPendientes);
+                    }
+                }
+
+                // ── Conteo para el reporte ─────────────────────────────────────────
+                int countFletes = await _database.Table<Tb_FlePer_FletePersonal>().CountAsync();
+                int countDetalles = await _database.Table<Tb_FlePer_DetFlete>().CountAsync();
+
+                // ── Borrado en orden correcto (detalles antes que padres) ──────────
                 await _database.DeleteAllAsync<Tb_FlePer_DetFlete>();
                 await _database.DeleteAllAsync<Tb_FlePer_FletePersonal>();
-                // Descomenta si necesitas limpiar estas (estaban comentadas en tu código)
-                // await _database.DeleteAllAsync<Tb_Cat_Proveedor>();
-                // await _database.DeleteAllAsync<Tb_FlePer_ProvRuta>();
-                // await _database.DeleteAllAsync<Tb_FlePer_Ruta>();
 
-                var toast = Toast.Make("Todas las tablas se han limpiado correctamente.", ToastDuration.Short);
-                await toast.Show();
+                int totalBorrados = countFletes + countDetalles;
+
+                _logger.LogWarning(
+                    "ClearAllTablesAsync ejecutado. Borrados: {Fletes} fletes, " +
+                    "{Detalles} detalles. ForceDelete={Force}",
+                    countFletes, countDetalles, forceDelete);
+
+                return ClearTablesResult.Ok(totalBorrados);
             }
             catch (Exception ex)
             {
-                var toast = Toast.Make($"Error al limpiar las tablas: {ex.Message}", ToastDuration.Long);
-                await toast.Show();
+                _logger.LogError(ex, "Error en ClearAllTablesAsync");
+                return ClearTablesResult.Error($"Error al limpiar tablas: {ex.Message}");
             }
         }
 
@@ -205,12 +290,12 @@ namespace BusCheckInV2.Services
                 var fechaLimite = DateTime.Now.AddDays(-diasAtras);
 
                 var query = _database.Table<Tb_FlePer_FletePersonal>()
-                    .Where(f => f.FlePer_Fecha != null);
+                    .Where(f => f.Fecha != null);
 
                 // Filtrar por chofer si se especifica
                 if (!string.IsNullOrEmpty(chofer))
                 {
-                    query = query.Where(f => f.FlePer_Chofer == chofer);
+                    query = query.Where(f => f.Chofer == chofer);
                 }
 
                 var fletes = await query.ToListAsync();
@@ -218,18 +303,31 @@ namespace BusCheckInV2.Services
                 // Filtrar por fecha manualmente
                 var fletesFiltrados = fletes.Where(f =>
                 {
-                    if (DateTime.TryParse(f.FlePer_Fecha, out DateTime fechaFlete))
-                    {
-                        return fechaFlete >= fechaLimite;
-                    }
-                    return false;
+                    return f.Fecha >= fechaLimite;
+                    //if (DateTime.TryParse(f.Fecha, out DateTime fechaFlete))
+                    //{
+                    //    return fechaFlete >= fechaLimite;
+                    //}
+                    //return false;
                 })
-                .Where(f => f.FlePer_Status != "Completado" && f.FlePer_Status != "Cancelado")
+                // FIX 2026-06-03 (A7): con el nuevo modelo, Status solo vale 'A' o 'C'.
+                // 'F' ya no existe (Finalizado usa 'A'). Excluimos solo 'C'
+                // aquí; el helper de abajo se encarga de distinguir entre
+                // Finalizado y Activo/En curso/Pendiente según los detalles.
+                .Where(f => f.Status != "C")
                 .ToList();
 
                 // Obtener todas las rutas y proveedores para mapeo
                 var todasRutas = await _database.Table<Tb_FlePer_Ruta>().ToListAsync();
                 var todosProveedores = await _database.Table<Tb_Cat_Proveedor>().ToListAsync();
+
+                // FIX 2026-06-03 (A4): cargar TODOS los detalles una sola vez
+                // (en vez de un query por flete) y agruparlos por IdFletePer
+                // para calcular EstadoCalculado localmente.
+                var todosDetalles = await _database.Table<Tb_FlePer_DetFlete>().ToListAsync();
+                var detallesPorFlete = todosDetalles
+                    .GroupBy(d => d.FleteLocalId)
+                    .ToDictionary(g => g.Key, g => g.ToList());
 
                 // Convertir a FletePendienteUI
                 var resultado = new List<FletePendienteUI>();
@@ -245,35 +343,53 @@ namespace BusCheckInV2.Services
                     }
 
                     // Buscar nombre del proveedor
-                    string nombreProveedor = flete.Prov_Clave ?? "Desconocido";
-                    if (!string.IsNullOrEmpty(flete.Prov_Clave))
+                    string nombreProveedor = flete.ProvClave ?? "Desconocido";
+                    if (!string.IsNullOrEmpty(flete.ProvClave))
                     {
-                        var proveedor = todosProveedores.FirstOrDefault(p => p.prov_clave == flete.Prov_Clave);
-                        nombreProveedor = proveedor?.prov_nombre ?? flete.Prov_Clave;
+                        var proveedor = todosProveedores.FirstOrDefault(p => p.ProvClave == flete.ProvClave);
+                        nombreProveedor = proveedor?.ProvNombre ?? flete.ProvClave;
                     }
 
                     // Parsear fecha y hora
                     DateTime fechaHora = DateTime.Now;
-                    if (DateTime.TryParse($"{flete.FlePer_Fecha} {flete.FlePer_Hora}", out DateTime parsedFecha))
+                    if (DateTime.TryParse($"{flete.Fecha} {flete.Hora}", out DateTime parsedFecha))
                     {
                         fechaHora = parsedFecha;
                     }
 
                     resultado.Add(new FletePendienteUI
                     {
+                        // FIX 2026-06-02: preservamos el código 1 char (P/I/A/F/C)
+                        // tal como está en SQLite, sin fallback a "Pendiente"
+                        // que ensucia la UI. El helper EsFletePendiente del
+                        // FletesPendientesViewModel ya entiende los códigos.
                         Id = flete.Id,
-                        IdFletePer = flete.IdFletePer,
+                        IdFletePer = (int?)flete.IdFletePer,
                         Ruta = nombreRuta,
                         FechaHora = fechaHora,
                         Proveedor = nombreProveedor,
-                        Chofer = flete.FlePer_Chofer ?? "Desconocido",
-                        Estatus = flete.FlePer_Status ?? "Pendiente",
-                        CantidadEsperada = flete.FlePer_Cantidad,
-                        CantidadReal = flete.FlePer_CantidadReal,
-                        TipoFlete = flete.FlePer_TipoFlete ?? "NORMAL",
-                        TipoViaje = flete.FlePer_TipoViaje ?? "TRAER GENTE",
-                        FechaInicio = flete.FlePer_FechaInicio,
-                        FechaFin = flete.FlePer_FechaFin
+                        Chofer = flete.Chofer ?? "Desconocido",
+                        Estatus = flete.Status ?? "P",
+                        CantidadEsperada = flete.Cantidad,
+                        CantidadReal = flete.Cantidad,
+                        TipoFlete = flete.TipoFlete ?? "NORMAL",
+                        TipoViaje = flete.TipoViaje ?? "TRAER GENTE",
+                        FechaInicio = flete.Fecha,
+                        FechaFin = flete.FechaFin,
+                        // FIX 2026-06-03 (A4): calcular EstadoCalculado + CantPasajeros
+                        // localmente con los detalles cacheados arriba.
+                        EstadoCalculado = CalcularEstadoCalculado(
+                            flete.Status, detallesPorFlete.GetValueOrDefault(flete.Id, new List<Tb_FlePer_DetFlete>())),
+                        CantPasajeros = detallesPorFlete.GetValueOrDefault(flete.Id, new List<Tb_FlePer_DetFlete>())
+                            .Count(d => d.CveNomina.HasValue && d.CveNomina != 0 && d.CveNomina != 9999),
+                        // FIX 2026-06-03: la UltimaFechaDetalle también debe
+                        // exponerse al UI para casos de uso futuro (ej. mostrar
+                        // "hace 3 horas" en la tarjeta del flete).
+                        UltimaFechaDetalle = detallesPorFlete.GetValueOrDefault(flete.Id, new List<Tb_FlePer_DetFlete>())
+                            .Where(d => d.Fecha.HasValue)
+                            .Select(d => d.Fecha!.Value)
+                            .DefaultIfEmpty(DateTime.MinValue)
+                            .Max()
                     });
                 }
 
@@ -291,12 +407,12 @@ namespace BusCheckInV2.Services
             try
             {
                 var choferes = await _database.Table<Tb_FlePer_FletePersonal>()
-                    .Where(f => !string.IsNullOrEmpty(f.FlePer_Chofer))
-                    .OrderBy(f => f.FlePer_Chofer)
+                    .Where(f => !string.IsNullOrEmpty(f.Chofer))
+                    .OrderBy(f => f.Chofer)
                     .ToListAsync();
 
                 return choferes
-                    .Select(f => f.FlePer_Chofer)
+                    .Select(f => f.Chofer)
                     .Distinct()
                     .ToList();
             }
@@ -316,22 +432,27 @@ namespace BusCheckInV2.Services
 
                 if (flete == null) return false;
 
-                flete.FlePer_Status = nuevoEstatus;
+                flete.Status = nuevoEstatus;
                 flete.IsSynced = false; // Marcar para sincronizar
 
                 if (cantidadReal.HasValue)
                 {
-                    flete.FlePer_CantidadReal = cantidadReal.Value;
+                    flete.Cantidad = cantidadReal.Value;
                 }
 
                 if (!string.IsNullOrEmpty(observaciones))
                 {
-                    flete.FlePer_Observaciones = observaciones;
+                    flete.Observaciones = observaciones;
                 }
 
-                if (nuevoEstatus == "Completado" || nuevoEstatus == "Cancelado")
+                // FIX 2026-06-02: aceptamos tanto los códigos 1 char del
+                // backend nuevo (F=Finalizado, C=Cancelado) como los
+                // strings legacy (Completado, Cancelado) por compatibilidad
+                // con código que ya guardó valores en mayúsculas.
+                if (nuevoEstatus == "F" || nuevoEstatus == "C" ||
+                    nuevoEstatus == "Completado" || nuevoEstatus == "Cancelado")
                 {
-                    flete.FlePer_FechaFin = DateTime.Now;
+                    flete.FechaFin = DateTime.Now;
                 }
 
                 var resultado = await _database.UpdateAsync(flete);
@@ -351,10 +472,10 @@ namespace BusCheckInV2.Services
                 var detalle = new Tb_FlePer_DetFlete
                 {
                     IdFletePer = idFletePer,
-                    FlePer_CveNomina = cveNomina,
-                    FlePer_Latitud = latitud.ToString(),
-                    FlePer_Longitud = longitud.ToString(),
-                    FlePer_Fecha = DateTime.Now,
+                    CveNomina = cveNomina,
+                    Latitud = latitud,
+                    Longitud = longitud,
+                    Fecha = DateTime.Now,
                     IsSynced = false
                 };
 
@@ -422,46 +543,110 @@ namespace BusCheckInV2.Services
 
         public async Task<int> SincronizarConApiAsync(IApiFleteService apiService)
         {
+            // FIX 2026-06-04: reescritura completa. El batch
+            // /SincronizarFletes del backend NO está confirmado y la
+            // firma exige un List<FleteSincronizacion> que no sabemos
+            // si el contrato del backend acepta. En cambio,
+            // /InsertarFletePersonal SÍ existe y ya lo usa el
+            // EscaneoCodigoViewModel con éxito (ronda 2026-06-02).
+            //
+            // Estrategia: recorrer los fletes locales con IsSynced=false
+            // y subirlos uno por uno al endpoint individual. Los que
+            // suban OK se marcan IsSynced=true en la BD local; los que
+            // fallen se dejan como están para el próximo intento.
+            //
+            // Devuelve la cantidad de fletes sincronizados con éxito
+            // (no la cantidad intentada, para que el VM muestre un
+            // número honesto al chofer).
             try
             {
+                if (apiService == null)
+                {
+                    _logger.LogWarning("SincronizarConApiAsync: apiService es null");
+                    return 0;
+                }
+
                 var fletesNoSincronizados = await ObtenerFletesNoSincronizadosAsync();
 
                 if (!fletesNoSincronizados.Any())
+                {
+                    _logger.LogInformation("SincronizarConApiAsync: no hay fletes pendientes");
                     return 0;
-
-                // Convertir a formato de sincronización
-                var fletesSync = fletesNoSincronizados.Select(f => new FleteSincronizacion
-                {
-                    IdFletePer = f.IdFletePer ?? 0,
-                    Fecha = f.FlePer_Fecha,
-                    Hora = f.FlePer_Hora,
-                    ProvClave = f.Prov_Clave,
-                    IdDestFlete = f.IdDestFlete ?? 0,
-                    TipoFlete = f.FlePer_TipoFlete,
-                    TipoViaje = f.FlePer_TipoViaje,
-                    Cantidad = f.FlePer_Cantidad ?? 0,
-                    Status = f.FlePer_Status,
-                    Chofer = f.FlePer_Chofer,
-                    CantidadReal = f.FlePer_CantidadReal,
-                    Observaciones = f.FlePer_Observaciones,
-                    IsSynced = f.IsSynced
-                }).ToList();
-
-                var resultado = await apiService.SincronizarFletesAsync(fletesSync);
-
-                if (resultado)
-                {
-                    // Marcar todos como sincronizados
-                    foreach (var flete in fletesNoSincronizados)
-                    {
-                        flete.IsSynced = true;
-                        await _database.UpdateAsync(flete);
-                    }
-
-                    return fletesNoSincronizados.Count;
                 }
 
-                return 0;
+                int sincronizados = 0;
+                int fallidos = 0;
+
+                foreach (var flete in fletesNoSincronizados)
+                {
+                    try
+                    {
+                        // FIX 2026-06-04: si el flete YA tiene un IdFletePer
+                        // del servidor, NO lo re-insertamos (sería un duplicado
+                        // en la BD). Solo lo marcamos como sincronizado.
+                        // Esto pasa cuando el flete se creó en el server y
+                        // se bajó al cache local, pero por algún motivo el
+                        // flag IsSynced quedó en false.
+                        if (flete.IdFletePer.HasValue && flete.IdFletePer.Value > 0)
+                        {
+                            flete.IsSynced = true;
+                            await _database.UpdateAsync(flete);
+                            sincronizados++;
+                            continue;
+                        }
+
+                        // Armar el request que espera /InsertarFletePersonal.
+                        // Coincide 1:1 con la firma que usa EscaneoCodigoViewModel
+                        // (línea 535 de fe1d280d__EscaneoCodigoViewModel.cs).
+                        var request = new FletePersonalRequest
+                        {
+                            Fecha = flete.Fecha?.ToString("yyyy-MM-dd")
+                                ?? DateTime.Now.ToString("yyyy-MM-dd"),
+                            Hora = flete.Hora?.ToString(@"hh\:mm\:ss")
+                                ?? DateTime.Now.TimeOfDay.ToString(@"hh\:mm\:ss"),
+                            ClaveProveedor = flete.ProvClave ?? string.Empty,
+                            IdDestFlete = (int)(flete.IdDestFlete ?? 0),
+                            TipoFlete = flete.TipoFlete ?? "NORMAL",
+                            TipoViaje = flete.TipoViaje ?? "TRAER GENTE",
+                            Cantidad = flete.Cantidad ?? 0,
+                            Estatus = flete.Status ?? "P",
+                            Chofer = flete.Chofer ?? string.Empty
+                        };
+
+                        long serverId = await apiService.InsertarFletePersonal(request);
+
+                        if (serverId > 0)
+                        {
+                            // Subió OK: guardar el ID del server y marcar synced
+                            flete.IdFletePer = serverId;
+                            flete.IsSynced = true;
+                            await _database.UpdateAsync(flete);
+                            sincronizados++;
+                        }
+                        else
+                        {
+                            _logger.LogWarning(
+                                "SincronizarConApiAsync: server rechazó el flete local Id={LocalId}",
+                                flete.Id);
+                            fallidos++;
+                        }
+                    }
+                    catch (Exception exFlete)
+                    {
+                        // NO abortar el batch: un flete que falla no debe
+                        // impedir subir los demás. Solo loguear y seguir.
+                        _logger.LogError(exFlete,
+                            "SincronizarConApiAsync: error con flete local Id={LocalId}",
+                            flete.Id);
+                        fallidos++;
+                    }
+                }
+
+                _logger.LogInformation(
+                    "SincronizarConApiAsync: {Ok} sincronizados, {Fail} fallaron de {Total} totales",
+                    sincronizados, fallidos, fletesNoSincronizados.Count);
+
+                return sincronizados;
             }
             catch (Exception ex)
             {
@@ -477,25 +662,37 @@ namespace BusCheckInV2.Services
                 var fechaLimite = DateTime.Now.AddDays(-dias);
 
                 var query = _database.Table<Tb_FlePer_FletePersonal>()
-                    .Where(f => f.FlePer_Chofer == chofer && f.FlePer_Fecha != null);
+                    .Where(f => f.Chofer == chofer && f.Fecha != null);
 
                 var fletes = await query.ToListAsync();
 
                 // Filtrar por fecha y estado
                 var fletesFiltrados = fletes.Where(f =>
                 {
-                    if (DateTime.TryParse(f.FlePer_Fecha, out DateTime fechaFlete))
-                    {
-                        return fechaFlete >= fechaLimite;
-                    }
-                    return false;
+                    return f.Fecha >= fechaLimite;
+                    //if (DateTime.TryParse(f.Fecha, out DateTime fechaFlete))
+                    //{
+                    //    return fechaFlete >= fechaLimite;
+                    //}
+                    //return false;
                 })
-                .Where(f => f.FlePer_Status != "Completado" && f.FlePer_Status != "Cancelado")
+                // FIX 2026-06-03 (A7): con el nuevo modelo, Status solo vale 'A' o 'C'.
+                // 'F' ya no existe (Finalizado usa 'A'). Excluimos solo 'C'
+                // aquí; el helper de abajo se encarga de distinguir entre
+                // Finalizado y Activo/En curso/Pendiente según los detalles.
+                .Where(f => f.Status != "C")
                 .ToList();
 
                 // Obtener información de rutas y proveedores
                 var todasRutas = await _database.Table<Tb_FlePer_Ruta>().ToListAsync();
                 var todosProveedores = await _database.Table<Tb_Cat_Proveedor>().ToListAsync();
+
+                // FIX 2026-06-03 (A4): cachear todos los detalles para
+                // calcular EstadoCalculado + CantPasajeros localmente.
+                var todosDetallesCache = await _database.Table<Tb_FlePer_DetFlete>().ToListAsync();
+                var detallesPorFleteCache = todosDetallesCache
+                    .GroupBy(d => d.FleteLocalId)
+                    .ToDictionary(g => g.Key, g => g.ToList());
 
                 // Convertir a FletePendienteUI
                 var resultado = new List<FletePendienteUI>();
@@ -510,35 +707,52 @@ namespace BusCheckInV2.Services
                         nombreRuta = ruta?.NomDestFlete ?? "Ruta desconocida";
                     }
 
-                    string nombreProveedor = flete.Prov_Clave ?? "Desconocido";
-                    if (!string.IsNullOrEmpty(flete.Prov_Clave))
+                    string nombreProveedor = flete.ProvClave ?? "Desconocido";
+                    if (!string.IsNullOrEmpty(flete.ProvClave))
                     {
-                        var proveedor = todosProveedores.FirstOrDefault(p => p.prov_clave == flete.Prov_Clave);
-                        nombreProveedor = proveedor?.prov_nombre ?? flete.Prov_Clave;
+                        var proveedor = todosProveedores.FirstOrDefault(p => p.ProvClave == flete.ProvClave);
+                        nombreProveedor = proveedor?.ProvNombre ?? flete.ProvClave;
                     }
 
                     // Parsear fecha y hora
                     DateTime fechaHora = DateTime.Now;
-                    if (DateTime.TryParse($"{flete.FlePer_Fecha} {flete.FlePer_Hora}", out DateTime parsedFecha))
+                    if (DateTime.TryParse($"{flete.Fecha} {flete.Hora}", out DateTime parsedFecha))
                     {
                         fechaHora = parsedFecha;
                     }
 
                     resultado.Add(new FletePendienteUI
                     {
+                        // FIX 2026-06-02: preservamos el código 1 char (P/I/A/F/C)
+                        // tal como está en SQLite, sin fallback a "Pendiente"
+                        // que ensucia la UI. El helper EsFletePendiente del
+                        // FletesPendientesViewModel ya entiende los códigos.
                         Id = flete.Id,
-                        IdFletePer = flete.IdFletePer,
+                        IdFletePer = (int?)flete.IdFletePer,
                         Ruta = nombreRuta,
                         FechaHora = fechaHora,
                         Proveedor = nombreProveedor,
-                        Chofer = flete.FlePer_Chofer ?? "Desconocido",
-                        Estatus = flete.FlePer_Status ?? "Pendiente",
-                        CantidadEsperada = flete.FlePer_Cantidad,
-                        CantidadReal = flete.FlePer_CantidadReal,
-                        TipoFlete = flete.FlePer_TipoFlete ?? "NORMAL",
-                        TipoViaje = flete.FlePer_TipoViaje ?? "TRAER GENTE",
-                        FechaInicio = flete.FlePer_FechaInicio,
-                        FechaFin = flete.FlePer_FechaFin
+                        Chofer = flete.Chofer ?? "Desconocido",
+                        Estatus = flete.Status ?? "P",
+                        CantidadEsperada = flete.Cantidad,
+                        CantidadReal = flete.Cantidad,
+                        TipoFlete = flete.TipoFlete ?? "NORMAL",
+                        TipoViaje = flete.TipoViaje ?? "TRAER GENTE",
+                        FechaInicio = flete.Fecha,
+                        FechaFin = flete.FechaFin,
+                        // FIX 2026-06-03 (A4): calcular EstadoCalculado + CantPasajeros
+                        // localmente con los detalles cacheados arriba.
+                        EstadoCalculado = CalcularEstadoCalculado(
+                            flete.Status, detallesPorFleteCache.GetValueOrDefault(flete.Id, new List<Tb_FlePer_DetFlete>())),
+                        CantPasajeros = detallesPorFleteCache.GetValueOrDefault(flete.Id, new List<Tb_FlePer_DetFlete>())
+                            .Count(d => d.CveNomina.HasValue && d.CveNomina != 0 && d.CveNomina != 9999),
+                        // FIX 2026-06-03: la UltimaFechaDetalle también debe
+                        // exponerse al UI para casos de uso futuro.
+                        UltimaFechaDetalle = detallesPorFleteCache.GetValueOrDefault(flete.Id, new List<Tb_FlePer_DetFlete>())
+                            .Where(d => d.Fecha.HasValue)
+                            .Select(d => d.Fecha!.Value)
+                            .DefaultIfEmpty(DateTime.MinValue)
+                            .Max()
                     });
                 }
 
@@ -558,17 +772,17 @@ namespace BusCheckInV2.Services
                 var fleteLocal = new Tb_FlePer_FletePersonal
                 {
                     IdFletePer = flete.IdFletePer,
-                    FlePer_Fecha = flete.Fecha,
-                    FlePer_Hora = flete.Hora,
-                    Prov_Clave = flete.ProveedorClave,
+                    Fecha = flete.Fecha,
+                    Hora = flete.Hora,
+                    ProvClave = flete.ProveedorClave,
                     IdDestFlete = flete.IdDestFlete,
-                    FlePer_TipoFlete = flete.TipoFlete,
-                    FlePer_TipoViaje = flete.TipoViaje,
-                    FlePer_Cantidad = flete.Cantidad,
-                    FlePer_Status = flete.Estatus,
-                    FlePer_Chofer = flete.Chofer,
-                    FlePer_CantidadReal = flete.CantidadReal,
-                    FlePer_Observaciones = flete.Observaciones,
+                    TipoFlete = flete.TipoFlete,
+                    TipoViaje = flete.TipoViaje,
+                    Cantidad = flete.Cantidad,
+                    Status = flete.Estatus,
+                    Chofer = flete.Chofer,
+                    //FlePer_CantidadReal = flete.CantidadReal,
+                    Observaciones = flete.Observaciones,
                     IsSynced = true
                 };
 
@@ -603,6 +817,122 @@ namespace BusCheckInV2.Services
             {
                 _logger.LogError(ex, "Error limpiando caché");
             }
+        }
+        #endregion
+
+        #region LOG DE SINCRONIZACION
+        public async Task RegistrarSyncLogAsync(
+    string tipoOperacion,
+    long? idFletePer,
+    bool exitoso,
+    string mensaje,
+    int registrosAfectados = 0,
+    int duracionMs = 0)
+        {
+            try
+            {
+                var entry = new Tb_Sync_Log
+                {
+                    Timestamp = DateTime.Now,
+                    TipoOperacion = tipoOperacion,
+                    IdFletePer = idFletePer,
+                    Exitoso = exitoso,
+                    Mensaje = mensaje,
+                    RegistrosAfectados = registrosAfectados,
+                    DuracionMs = duracionMs
+                };
+                await _database.InsertAsync(entry);
+            }
+            catch (Exception ex)
+            {
+                // El log nunca debe interrumpir el flujo principal
+                _logger.LogWarning(ex, "No se pudo escribir sync log");
+            }
+        }
+
+        public async Task<List<Tb_Sync_Log>> ObtenerSyncLogAsync(int ultimos = 50)
+        {
+            try
+            {
+                return await _database.Table<Tb_Sync_Log>()
+                    .OrderByDescending(l => l.Timestamp)
+                    .Take(ultimos)
+                    .ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error leyendo sync log");
+                return new List<Tb_Sync_Log>();
+            }
+        }
+
+        public async Task LimpiarSyncLogAntiguoAsync(int diasRetencion = 7)
+        {
+            try
+            {
+                var limite = DateTime.Now.AddDays(-diasRetencion);
+                await _database.Table<Tb_Sync_Log>()
+                    .Where(l => l.Timestamp < limite)
+                    .DeleteAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error limpiando sync log antiguo");
+            }
+        }
+
+        // FIX 2026-06-03 (A4): helper privado que replica la misma
+        // logica que el backend en WSBusCheckInV2Controller.ObtenerFletesPorChofer
+        // para calcular EstadoCalculado. Esto es necesario porque
+        // (a) la BD local NO tiene el campo EstadoCalculado (es derivado)
+        // (b) la UI debe mostrar el estado fino (Activo/En curso/Pendiente/
+        //     Finalizado/Cancelado), NO el codigo 1 char de Status
+        // (c) cuando el flete viene del cache local, no tenemos el derivado
+        //     del backend, asi que lo calculamos aca
+        //
+        // Reglas (las mismas que el backend):
+        //   - Status='C' sin pasajeros (solo INICIO o INICIO+FIN sin medio) → Cancelado
+        //   - Status='C' con pasajeros                                              → Pendiente
+        //   - Status='A' con FIN (CveNomina=9999, Nombre='FIN')                 → Finalizado
+        //   - Status='A' con INICIO + >=1 pasajero + ultimo registro <5h         → En curso
+        //   - Status='A' con INICIO + >=1 pasajero (>=5h o sin UltimaFecha)     → Pendiente
+        //   - Status='A' con INICIO sin pasajeros                                  → Pendiente
+        //   - Status='A' sin INICIO                                                → Activo
+        private static string CalcularEstadoCalculado(
+            string status,
+            List<Tb_FlePer_DetFlete> detalles)
+        {
+            if (detalles == null) detalles = new List<Tb_FlePer_DetFlete>();
+
+            int cantPasajeros = detalles.Count(d =>
+                d.CveNomina.HasValue && d.CveNomina != 0 && d.CveNomina != 9999);
+
+            bool tieneInicio = detalles.Any(d => d.CveNomina == 0);
+            bool tieneFin = detalles.Any(d =>
+                d.CveNomina == 9999 && d.Nombre == "FIN");
+
+            DateTime? ultimaFecha = detalles
+                .Where(d => d.Fecha.HasValue)
+                .Select(d => d.Fecha!.Value)
+                .DefaultIfEmpty(DateTime.MinValue)
+                .Max();
+
+            bool ultimas5h = ultimaFecha.HasValue &&
+                             (DateTime.Now - ultimaFecha.Value).TotalHours < 5;
+
+            if (status == "C" && cantPasajeros == 0)
+                return "Cancelado";
+            if (status == "C")
+                return "Pendiente";
+            if (status == "A" && tieneFin)
+                return "Finalizado";
+            if (status == "A" && tieneInicio && cantPasajeros > 0 && ultimas5h)
+                return "En curso";
+            if (status == "A" && tieneInicio && cantPasajeros > 0)
+                return "Pendiente";
+            if (status == "A" && tieneInicio)
+                return "Pendiente";
+            return "Activo";
         }
         #endregion
     }
