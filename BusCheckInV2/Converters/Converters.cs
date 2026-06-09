@@ -11,14 +11,54 @@ namespace BusCheckInV2.Converters
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotImplementedException();
     }
 
-    // Convierte el estado de sincronización en un color (rojo para "Pendiente", verde para "Sincronizado")
+    // Convierte el estado de sincronización en un color.
+    // FIX 2026-06-03 (Opción A): ahora recibimos directamente el
+    // EstadoCalculado del backend (uno de: Activo, En curso, Pendiente,
+    // Finalizado, Cancelado). Mapeo directo a colores:
+    //   Activo / En curso / Pendiente → Rojo (requiere atención del chofer)
+    //   Finalizado                     → Verde (listo, todo OK)
+    //   Cancelado                      → Gris (cerrado sin éxito)
+    //
+    // Mantenemos fallback a los códigos 1 char (P/I/A/F/C) y a los
+    // strings legacy por si alguna parte del pipeline no se actualizó.
     public class StatusToColorConverter : IValueConverter
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
             if (value is string status)
             {
-                return status.Contains("Pendiente", StringComparison.OrdinalIgnoreCase) ? Colors.Red : Colors.Green;
+                var s = status.Trim();
+
+                // Camino 1 (preferido): EstadoCalculado del backend nuevo
+                if (s.Equals("Activo", StringComparison.OrdinalIgnoreCase) ||
+                    s.Equals("En curso", StringComparison.OrdinalIgnoreCase) ||
+                    s.Equals("Pendiente", StringComparison.OrdinalIgnoreCase))
+                    return Colors.Red;
+                if (s.Equals("Finalizado", StringComparison.OrdinalIgnoreCase))
+                    return Colors.Green;
+                if (s.Equals("Cancelado", StringComparison.OrdinalIgnoreCase))
+                    return Colors.Gray;
+
+                // Camino 2: códigos 1 char (Status='P'/'I'/'A'/'F'/'C')
+                if (s == "P" || s == "I" || s == "A")
+                    return Colors.Red;
+                if (s == "F")
+                    return Colors.Green;
+                if (s == "C")
+                    return Colors.Gray;
+
+                // Camino 3: fallback a strings legacy
+                if (s.Contains("Pendiente", StringComparison.OrdinalIgnoreCase) ||
+                    s.Contains("Iniciado", StringComparison.OrdinalIgnoreCase) ||
+                    s.Contains("Inconcluso", StringComparison.OrdinalIgnoreCase) ||
+                    s.Contains("Activo", StringComparison.OrdinalIgnoreCase) ||
+                    s.Contains("Aprobado", StringComparison.OrdinalIgnoreCase))
+                    return Colors.Red;
+                if (s.Contains("Finalizado", StringComparison.OrdinalIgnoreCase) ||
+                    s.Contains("Completado", StringComparison.OrdinalIgnoreCase))
+                    return Colors.Green;
+                if (s.Contains("Cancelado", StringComparison.OrdinalIgnoreCase))
+                    return Colors.Gray;
             }
             return Colors.Gray;
         }
@@ -91,11 +131,37 @@ namespace BusCheckInV2.Converters
         {
             if (value is string status)
             {
-                return status switch
+                var s = status.Trim();
+
+                // FIX 2026-06-03 (Opción A): mapeo de los estados finos.
+                //   Activo / En curso / Pendiente → ▶️  (ver detalles / seguir trabajando)
+                //   Finalizado                     → ✅  (todo OK)
+                //   Cancelado                      → ❌  (cerrado sin éxito)
+                if (s.Equals("Activo", StringComparison.OrdinalIgnoreCase) ||
+                    s.Equals("En curso", StringComparison.OrdinalIgnoreCase) ||
+                    s.Equals("Pendiente", StringComparison.OrdinalIgnoreCase))
+                    return "▶️";
+                if (s.Equals("Finalizado", StringComparison.OrdinalIgnoreCase))
+                    return "✅";
+                if (s.Equals("Cancelado", StringComparison.OrdinalIgnoreCase))
+                    return "❌";
+
+                // Fallback a códigos 1 char
+                if (s == "P" || s == "I" || s == "A")
+                    return "▶️";
+                if (s == "F")
+                    return "✅";
+                if (s == "C")
+                    return "❌";
+
+                // Fallback a strings legacy
+                return s switch
                 {
                     "Pendiente" => "▶️",
-                    "Iniciado" => "⏸️",
-                    "Inconcluso" => "🔁",
+                    "Iniciado" => "▶️",
+                    "Inconcluso" => "▶️",
+                    "Completado" => "✅",
+                    "Cancelado" => "❌",
                     _ => "👁️"
                 };
             }

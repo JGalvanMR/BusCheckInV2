@@ -241,34 +241,66 @@ namespace BusCheckInV2.ViewModels
                     {
                         fletes = apiResponse.Data.Select(f =>
                         {
-                            // FIX 2026-06-01 (Problema #3c): parseo de fecha
-                            // robusto. Antes usaba DateTime.TryParse sin
-                            // culture, lo que en dispositivos con cultura
-                            // es-MX dd/MM/yyyy fallaba con "2023-12-01 10:30:00"
-                            // y devolvía DateTime.MinValue, mostrándose
-                            // 01/01/0001 00:00 en la UI. Ahora usamos
-                            // InvariantCulture porque el backend SIEMPRE
-                            // emite ISO 8601 (yyyy-MM-dd HH:mm:ss) desde SQL Server.
+                            // FIX 2026-06-04 (Problema fecha 01/01/0001):
+                            // El backend emite DOS campos separados:
+                            //   - f.Fecha:  "02/06/2026 12:00:00 a. m."  (cultura es-MX con sufijo AM/PM)
+                            //   - f.Hora:   "09:18:02"                       (HH:mm:ss, sin fecha)
+                            //
+                            // El nombre del campo engaña: "Fecha" NO es solo la
+                            // fecha, es un DATETIME completo en formato es-MX.
+                            // Y "Hora" NO es la hora de creación, es la hora
+                            // del día que el chofer tenía planificada.
+                            //
+                            // La fecha/hora que el chofer quiere VER en la
+                            // lista es: la fecha planificada (de f.Fecha) + la
+                            // hora planificada (de f.Hora).
+                            //
+                            // Ejemplo real del JSON del usuario:
+                            //   f.Fecha = "02/06/2026 12:00:00 a. m."  → tomar solo "02/06/2026"
+                            //   f.Hora  = "09:18:02"                   → concatenar
+                            //   Resultado: "02/06/2026 09:18:02"        → parsear OK
+                            //
+                            // ANTES concatenaba todo y el sufijo "a. m."
+                            // rompía el parseo, devolviendo MinValue y
+                            // mostrándose 01/01/0001 00:00 en la UI.
                             DateTime fechaHora = DateTime.MinValue;
-                            string combinado = $"{f.Fecha} {f.Hora}".Trim();
-                            if (!string.IsNullOrWhiteSpace(combinado))
+
+                            // Estrategia 1: extraer solo la parte de fecha
+                            // de f.Fecha (primeros 10 chars = "dd/MM/yyyy")
+                            // y concatenar con f.Hora. Parsear con cultura
+                            // es-MX para entender el sufijo AM/PM si quedó.
+                            string soloFecha = f.Fecha ?? string.Empty;
+                            if (soloFecha.Length >= 10)
+                                soloFecha = soloFecha.Substring(0, 10);
+
+                            string combinadoLimpio = $"{soloFecha} {f.Hora ?? ""}".Trim();
+
+                            if (!string.IsNullOrWhiteSpace(combinadoLimpio))
                             {
-                                if (!DateTime.TryParse(combinado,
-                                        CultureInfo.InvariantCulture,
-                                        DateTimeStyles.AssumeLocal,
-                                        out fechaHora))
+                                // Cultura es-MX entiende "dd/MM/yyyy" + "HH:mm:ss"
+                                var esMX = CultureInfo.GetCultureInfo("es-MX");
+                                if (!DateTime.TryParse(combinadoLimpio, esMX,
+                                        DateTimeStyles.AssumeLocal, out fechaHora))
                                 {
-                                    // Segundo intento con formatos exactos de SQL Server
-                                    string[] formatos = {
-                                        "yyyy-MM-dd HH:mm:ss",
-                                        "yyyy-MM-dd HH:mm",
-                                        "yyyy-MM-dd",
-                                        "yyyy-MM-ddTHH:mm:ss"
-                                    };
-                                    DateTime.TryParseExact(combinado, formatos,
-                                        CultureInfo.InvariantCulture,
-                                        DateTimeStyles.AssumeLocal,
-                                        out fechaHora);
+                                    // Fallback 1: InvariantCulture (ISO 8601)
+                                    if (!DateTime.TryParse(combinadoLimpio,
+                                            CultureInfo.InvariantCulture,
+                                            DateTimeStyles.AssumeLocal, out fechaHora))
+                                    {
+                                        // Fallback 2: formatos exactos conocidos
+                                        string[] formatos = {
+                                            "dd/MM/yyyy HH:mm:ss",
+                                            "dd/MM/yyyy HH:mm",
+                                            "yyyy-MM-dd HH:mm:ss",
+                                            "yyyy-MM-dd HH:mm",
+                                            "yyyy-MM-dd",
+                                            "yyyy-MM-ddTHH:mm:ss"
+                                        };
+                                        DateTime.TryParseExact(combinadoLimpio, formatos,
+                                            CultureInfo.InvariantCulture,
+                                            DateTimeStyles.AssumeLocal,
+                                            out fechaHora);
+                                    }
                                 }
                             }
 
@@ -286,6 +318,17 @@ namespace BusCheckInV2.ViewModels
                                 CantidadReal = f.CantidadReal,
                                 FechaInicio = f.FechaInicio,
                                 FechaFin = f.FechaFin,
+                                // FIX 2026-06-03 (Opción A): el backend ahora
+                                // expone EstadoCalculado (uno de: Activo,
+                                // En curso, Pendiente, Finalizado, Cancelado).
+                                // Lo usamos directamente si viene; si no, fallback
+                                // a calcularlo localmente con los campos que SÍ
+                                // deserializa FleteResponse.
+                                EstadoCalculado = !string.IsNullOrWhiteSpace(f.EstadoCalculado)
+                                    ? f.EstadoCalculado
+                                    : CalcularEstadoDesdeFleteResponse(f),
+                                CantPasajeros = f.CantPasajeros,
+                                UltimaFechaDetalle = f.UltimaFechaDetalle,
                                 // FIX 2026-06-02 (Nivel 2 #19+#23):
                                 // El backend expone EsPendiente derivado,
                                 // pero la clase FleteResponse del cliente
@@ -351,35 +394,58 @@ namespace BusCheckInV2.ViewModels
             }
         }
 
-        // FIX 2026-06-02: simplificación del helper de pendiente.
-        // Antes usaba reflexión (GetProperty + GetValue) que es:
-        //   1) LENTO: cada llamada recorre el árbol de tipos
-        //   2) FRÁGIL: si el modelo cambia el nombre o tipo, falla silencioso
-        //   3) INNECESARIO: el backend ya expone el campo EsPendiente derivado
-        //
-        // Ahora leemos directamente f.EsPendiente. Mantengo un fallback
-        // DEFENSIVO (no por reflexión) por si alguien aún no actualizó
-        // el modelo FletePendienteUI para tener el campo bool EsPendiente.
-        // El fallback replica la lógica del backend con los datos que SÍ
-        // tenemos seguros (Estatus, FechaInicio, FechaFin).
+        // FIX 2026-06-03 (Opción A): simplificación del helper de pendiente.
+        // Ahora la fuente de verdad es EstadoCalculado (string fino que
+        // viene del backend o se calcula localmente en SQLiteService).
+        // Un flete es "pendiente de acción del chofer" si su estado es
+        // Activo / En curso / Pendiente. NO si es Finalizado o Cancelado.
         private static bool EsFletePendiente(FletePendienteUI f)
         {
             if (f == null) return false;
 
-            // Camino 1 (preferido): el modelo expone EsPendiente (bool)
-            // y el mapeo desde la API lo llena correctamente.
-            if (f.EsPendiente)
-                return true;
+            // Camino 1 (preferido): usar EstadoCalculado si el modelo lo
+            // tiene seteado (que debería ser el caso normal post-fix).
+            var estado = f.EstadoCalculado?.Trim() ?? "";
+            if (!string.IsNullOrEmpty(estado))
+            {
+                return estado.Equals("Activo", StringComparison.OrdinalIgnoreCase)
+                    || estado.Equals("En curso", StringComparison.OrdinalIgnoreCase)
+                    || estado.Equals("Pendiente", StringComparison.OrdinalIgnoreCase);
+            }
 
-            // Camino 2 (fallback): recalcular manualmente si el campo
-            // EsPendiente viniera como false por error de mapeo o por
-            // usar un modelo viejo sin esa propiedad.
+            // Camino 2 (fallback): calcular con Estatus (códigos 1 char).
+            // Compatible con versiones viejas del backend que no mandan
+            // EstadoCalculado.
             bool estatusP = !string.IsNullOrEmpty(f.Estatus) &&
-                            f.Estatus.Trim().Equals("P", StringComparison.OrdinalIgnoreCase);
+                            (f.Estatus.Trim().Equals("P", StringComparison.OrdinalIgnoreCase) ||
+                             f.Estatus.Trim().Equals("I", StringComparison.OrdinalIgnoreCase) ||
+                             f.Estatus.Trim().Equals("A", StringComparison.OrdinalIgnoreCase));
             bool tieneInicio = f.FechaInicio.HasValue && f.FechaInicio > DateTime.MinValue;
             bool tieneFin = f.FechaFin.HasValue && f.FechaFin > DateTime.MinValue;
 
             return estatusP || (tieneInicio && !tieneFin);
+        }
+
+        // FIX 2026-06-03 (Opción A): helper de fallback para cuando el
+        // backend NO manda EstadoCalculado (versión vieja). Replica la
+        // misma lógica que SQLiteService.CalcularEstadoCalculado pero
+        // con los datos que SÍ llegan en FleteResponse.
+        private static string CalcularEstadoDesdeFleteResponse(FleteResponse f)
+        {
+            string status = f.Estatus?.Trim() ?? "A";
+            int cantPasajeros = f.CantPasajeros;
+            bool tieneInicio = f.FechaInicio.HasValue && f.FechaInicio > DateTime.MinValue;
+            bool tieneFin = f.FechaFin.HasValue && f.FechaFin > DateTime.MinValue;
+            bool ultimas5h = f.UltimaFechaDetalle.HasValue &&
+                             (DateTime.Now - f.UltimaFechaDetalle.Value).TotalHours < 5;
+
+            if (status == "C" && cantPasajeros == 0) return "Cancelado";
+            if (status == "C") return "Pendiente";
+            if (status == "A" && tieneFin) return "Finalizado";
+            if (status == "A" && tieneInicio && cantPasajeros > 0 && ultimas5h) return "En curso";
+            if (status == "A" && tieneInicio && cantPasajeros > 0) return "Pendiente";
+            if (status == "A" && tieneInicio) return "Pendiente";
+            return "Activo";
         }
 
         // ─── COMANDOS RESTANTES SIN CAMBIOS DE LÓGICA ────────────────────

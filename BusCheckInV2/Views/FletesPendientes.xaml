@@ -133,7 +133,21 @@
                         Spacing="10"
                         VerticalOptions="Center">
                         <HorizontalStackLayout Spacing="6" VerticalOptions="Center">
-                            <Switch IsToggled="{Binding MostrarSoloPendientes}" Scale="0.9" />
+                            <!--
+                                FIX 2026-06-04: agregamos Toggled event para que
+                                el cambio del switch recargue la lista
+                                inmediatamente, sin tener que pulsar "Actualizar".
+                                El binding IsToggled ya actualiza la propiedad
+                                MostrarSoloPendientes en el VM (TwoWay por
+                                defecto), pero NO dispara el comando de carga.
+                                El handler OnMostrarSoloPendientesChanged en
+                                FletesPendientes.xaml.cs hace el ExecuteAsync
+                                del comando.
+                            -->
+                            <Switch
+                                IsToggled="{Binding MostrarSoloPendientes}"
+                                Scale="0.9"
+                                Toggled="OnMostrarSoloPendientesChanged" />
                             <Label
                                 FontSize="12"
                                 Text="Solo pendientes"

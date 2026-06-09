@@ -9,7 +9,7 @@
 		<SingleProject>true</SingleProject>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
-
+		<UseMaterial3>true</UseMaterial3>
 		<!-- Display name -->
 		<ApplicationTitle>BusCheckInV2</ApplicationTitle>
 
@@ -35,8 +35,9 @@
 		<AndroidSigningStorePass>GABIRA</AndroidSigningStorePass>
 		<AndroidSigningKeyAlias>GABIRA</AndroidSigningKeyAlias>
 		<AndroidSigningKeyPass>GABIRA</AndroidSigningKeyPass>
-		<ApplicationVersion>20</ApplicationVersion>
+		<ApplicationVersion>22</ApplicationVersion>
 		<AndroidUseAapt2>True</AndroidUseAapt2>
+		<ApplicationDisplayVersion>2.1.1</ApplicationDisplayVersion>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net9.0-android|AnyCPU'">
@@ -44,17 +45,18 @@
 		<AndroidSigningStorePass>GABIRA</AndroidSigningStorePass>
 		<AndroidSigningKeyAlias>GABIRA</AndroidSigningKeyAlias>
 		<AndroidSigningKeyPass>GABIRA</AndroidSigningKeyPass>
-		<ApplicationVersion>20</ApplicationVersion>
+		<ApplicationVersion>22</ApplicationVersion>
 		<EmbedAssembliesIntoApk>True</EmbedAssembliesIntoApk>
 		<AndroidUseAapt2>True</AndroidUseAapt2>
+		<ApplicationDisplayVersion>2.1.1</ApplicationDisplayVersion>
 	</PropertyGroup>
 
 	<ItemGroup>
 		<!-- App Icon -->
-		<MauiIcon Include="Resources\AppIcon\appicons.png" />
+		<MauiIcon Include="Resources\AppIcon\appiconbcia.png" />
 
 		<!-- Splash Screen -->
-		<MauiSplashScreen Include="Resources\Splash\splash.png" Color="#FFFFFF" />
+		<MauiSplashScreen Include="Resources\Splash\splashbcia.png" Color="#FFFFFF" />
 
 		<!-- Images -->
 		<MauiImage Include="Resources\Images\*" />
@@ -81,7 +83,9 @@
 	</ItemGroup>
 
 	<ItemGroup>
+	  <None Remove="Resources\AppIcon\appiconbcia.png" />
 	  <None Remove="Resources\AppIcon\appicons.png" />
+	  <None Remove="Resources\Splash\splashbcia.png" />
 	</ItemGroup>
 
 	<ItemGroup>

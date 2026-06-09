@@ -25,5 +25,21 @@ namespace BusCheckInV2.Models
         public DateTime? FechaFin { get; set; }
         public string Observaciones { get; set; }
         public int PuntosRegistrados { get; set; }
+
+        // ── FIX 2026-06-03 (Opción A) ──────────────────────────────────────
+        // El backend ahora expone 3 campos derivados de los detalles del
+        // flete. Si tu backend está actualizado, los vas a recibir
+        // deserializados automáticamente. Si no, quedan en sus defaults
+        // (0, null, "Activo") y la UI puede calcularlos localmente.
+
+        // Cantidad de pasajeros escaneados (CveNomina NOT IN (0, 9999))
+        public int CantPasajeros { get; set; }
+
+        // Timestamp del último registro de detalle (cualquiera)
+        public DateTime? UltimaFechaDetalle { get; set; }
+
+        // Estado conceptual derivado (Activo/En curso/Pendiente/Finalizado/Cancelado)
+        // Es el que la UI debe mostrar, NO Estatus (que vale 'A' o 'C')
+        public string EstadoCalculado { get; set; } = "Activo";
     }
 }

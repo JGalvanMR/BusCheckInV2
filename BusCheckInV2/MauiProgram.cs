@@ -1,8 +1,6 @@
 ﻿using BarcodeScanning;
-using BusCheckInV2.Constants;
 using BusCheckInV2.Platforms.Android.Services;
 using BusCheckInV2.Services;
-using BusCheckInV2.Services.Sync;
 using BusCheckInV2.ViewModels;
 using BusCheckInV2.Views;
 using CommunityToolkit.Maui;
@@ -40,11 +38,22 @@ public static class MauiProgram
         builder.Services.AddSingleton<INavigationService, NavigationService>();
         builder.Services.AddSingleton<IAudioService, AudioService>();
 
+        // FIX 2026-06-02 (C5): el BaseAddress/Timeout que se setean aquí
+        // son IGNORADOS por ApiFleteService porque usa GetApiUrl() que
+        // concatena ApiConstants.BaseUrlDebug + ApiConstants.ApiPath. Las
+        // URLs finales del log del usuario (http://189.206.160.206:82/
+        // BusCheckInV2/api/WSBusCheckInV2/...) confirman que se usa
+        // ApiConstants, no el BaseAddress del HttpClient.
+        //
+        // Por seguridad, mantenemos el User-Agent y el retry policy (esos
+        // SÍ se respetan), pero comentamos BaseAddress y Timeout porque
+        // dan una falsa sensación de control sobre algo que en realidad
+        // no controlan.
         // HttpClient con Polly
         builder.Services.AddHttpClient<IApiFleteService, ApiFleteService>(client =>
         {
-            client.BaseAddress = new Uri(GetApiBaseUrl());
-            client.Timeout = TimeSpan.FromSeconds(15);
+            //client.BaseAddress = new Uri(GetApiBaseUrl());  // IGNORADO por ApiFleteService
+            //client.Timeout = TimeSpan.FromSeconds(15);     // IGNORADO por ApiFleteService
             client.DefaultRequestHeaders.Add("User-Agent", "BusCheckInV2-MAUI");
         })
         .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler())
@@ -54,8 +63,15 @@ public static class MauiProgram
         builder.Services.AddSingleton<ISQLiteService, SQLiteService>();
         builder.Services.AddSingleton<IVersionService, VersionServiceAndroid>();
         builder.Services.AddSingleton<IAppUpdateService, AppUpdateService>();
-        builder.Services.AddSingleton<ISyncService, SyncService>();
-        builder.Services.AddHostedService<SyncBackgroundService>();
+
+        // FIX 2026-06-02 (C4): SyncService tiene URL hardcodeada
+        // "https://your-server-url/api/your-endpoint" (placeholder) y
+        // SyncBackgroundService la ejecuta en loop infinito cada 5 min.
+        // Si en el futuro se arregla SyncService, va a duplicar
+        // sincronizaciones con las que ya hace EscaneoCodigoViewModel
+        // cada 15 segundos. Por ahora, lo desactivamos.
+        // builder.Services.AddSingleton<ISyncService, SyncService>();
+        // builder.Services.AddHostedService<SyncBackgroundService>();
 
         // ViewModels
         builder.Services.AddTransient<SeleccionDeFleteViewModel>();
@@ -77,14 +93,19 @@ public static class MauiProgram
         return builder.Build();
     }
 
-    private static string GetApiBaseUrl()
-    {
-#if DEBUG
-        return ApiConstants.BaseUrlDebug;
-#else
-        return ApiConstants.BaseUrlRelease;
-#endif
-    }
+    // FIX 2026-06-02 (C5): este método ya no se usa porque BaseAddress
+    // se ignora (ver comentario arriba). Lo dejamos comentado para
+    // referencia futura: si en algún momento se quiere usar
+    // BaseAddress de verdad, hay que cambiar ApiFleteService.GetApiUrl
+    // para usar client.BaseAddress en vez de ApiConstants.
+    //private static string GetApiBaseUrl()
+    //{
+    //#if DEBUG
+    //    return ApiConstants.BaseUrlDebug;
+    //#else
+    //    return ApiConstants.BaseUrlRelease;
+    //#endif
+    //}
 
     private static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy()
     {

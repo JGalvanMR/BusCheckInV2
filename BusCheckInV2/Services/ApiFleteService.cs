@@ -237,6 +237,12 @@ namespace BusCheckInV2.Services
 
         public async Task<bool> InsertarDetFlete(DetFleteRequest request)
         {
+            // FIX 2026-06-02 (CRÍTICO): el backend tiene [Required] en
+            // FlePer_Nombre y rechaza con 400 si llega null/vacío.
+            // Como det.Nombre es null para pasajeros escaneados, el
+            // DetFleteRequest llega con FlePer_Nombre=null → 400.
+            // Sanitizamos AQUÍ antes de serializar.
+            request = SanitizarDetFleteRequest(request);
             var url = GetApiUrl("/InsertarDetFlete");
             var content = new StringContent(JsonSerializer.Serialize(request, _jsonOptions), Encoding.UTF8, "application/json");
 
@@ -248,6 +254,7 @@ namespace BusCheckInV2.Services
 
         public async Task<bool> InsertarInicioDetFlete(DetFleteRequest request)
         {
+            request = SanitizarDetFleteRequest(request);
             var url = GetApiUrl("/InsertarInicioDetFlete");
             var content = new StringContent(JsonSerializer.Serialize(request, _jsonOptions), Encoding.UTF8, "application/json");
 
@@ -259,6 +266,7 @@ namespace BusCheckInV2.Services
 
         public async Task<bool> InsertarFinDetFlete(DetFleteRequest request)
         {
+            request = SanitizarDetFleteRequest(request);
             var url = GetApiUrl("/InsertarFinDetFlete");
             var content = new StringContent(JsonSerializer.Serialize(request, _jsonOptions), Encoding.UTF8, "application/json");
 
@@ -266,6 +274,21 @@ namespace BusCheckInV2.Services
                 () => _httpClient.PostAsync(url, content), "InsertarFinDetFlete");
 
             return response?.Success == true && response.Data?.Contains("Insertado") == true;
+        }
+
+        // FIX 2026-06-02: helper que garantiza que FlePer_Nombre nunca
+        // llegue null/vacío al backend. El SQL del backend calcula el
+        // nombre real desde tb_cat_empleados usando FlePer_CveNomina,
+        // así que el valor que mandamos es decorativo: solo necesitamos
+        // pasar la validación [Required].
+        private static DetFleteRequest SanitizarDetFleteRequest(DetFleteRequest request)
+        {
+            if (request == null) return request;
+            if (string.IsNullOrWhiteSpace(request.FlePer_Nombre))
+            {
+                request.FlePer_Nombre = "(pendiente)";
+            }
+            return request;
         }
 
         public async Task<bool> UpdateFletePersonal(UpdateFleteRequest request)
@@ -283,25 +306,28 @@ namespace BusCheckInV2.Services
     int serverIdFletePer,
     List<DetFleteItemRequest> items)
         {
-            // FIX (2026-06-01): el backend (WSBusCheckInV2Controller.SincronizarDetFletes)
-            // devuelve ApiResponse<DetFletesBatchResult>. El tipo del cliente se
-            // llama DetFletesBatchSyncResult por legado. El wire format (JSON)
-            // depende SOLO de los nombres de propiedad, no del nombre de la
-            // clase, así que el mapeo funciona mientras la clase del cliente
-            // tenga estas propiedades EXACTAS:
+            // FIX 2026-06-02 (CRÍTICO encontrado en log del usuario):
+            // El backend (WSBusCheckInV2Controller.InsertarDetFlete y
+            // SincronizarDetFletes) tiene [Required] en FlePer_Nombre y
+            // rechaza con 400 BadRequest si llega null/vacío. Log real:
+            //   "errors":{"FlePer_Nombre":["The FlePer_Nombre field is required."]}
+            //   Status: 400 en /InsertarDetFlete
             //
-            //   bool   Success
-            //   int    TotalInsertados
-            //   int    TotalFallidos
-            //   List<int> LocalIdsFallidos
-            //   string Message
+            // Curiosidad: el SQL del backend IGNORA el valor enviado
+            // y hace CONCAT(...) desde tb_cat_empleados usando
+            // @FlePer_CveNomina. El campo FlePer_Nombre es decorativo,
+            // pero la validación [Required] se ejecuta antes.
             //
-            // Si en algún momento se renombra la clase o se le quitan/añaden
-            // propiedades, este método dejará de deserializar correctamente.
-            // Acción recomendada (no incluida aquí por no tener acceso a la
-            // definición de DetFletesBatchSyncResult): renombrarla a
-            // DetFletesBatchResult para coincidir 1:1 con el backend, o
-            // agregar un campo [JsonPropertyName("totalInsertados")] explícito.
+            // Por eso mandamos un placeholder que pasa la validación
+            // pero el backend descarta. El endpoint batch NO acepta
+            // FlePer_Nombre en su payload (solo en el endpoint individual),
+            // así que este fix solo aplica al endpoint individual.
+            //
+            // Acción recomendada (no aplicada): renombrar la clase
+            // DetFletesBatchSyncResult a DetFletesBatchResult para
+            // coincidir 1:1 con el backend, o agregar
+            // [JsonPropertyName("totalInsertados")] explícito. No rompe
+            // mientras el wire format (nombres de propiedad JSON) coincida.
             var url = GetApiUrl("/SincronizarDetFletes");
 
             var payload = new
