@@ -26,6 +26,7 @@ namespace BusCheckInV2.ViewModels
         private readonly INavigationService _navigationService;
         private readonly CancellationTokenSource _gpsTokenSource = new();
         private bool _disposed;
+        private bool _finalizandoEnCurso;
 
         // FIX 2026-06-01 (Problema #3b del usuario): previene que el botón
         // Actualizar y el pull-to-refresh del RefreshView disparen dos cargas
@@ -112,7 +113,10 @@ namespace BusCheckInV2.ViewModels
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[AutoLoad] {ex.Message}");
+                await MainThread.InvokeOnMainThreadAsync(() =>
+                {
+                    MensajeEstado = $"Error auto-carga: {ex.Message}";
+                });
             }
         }
         // ─────────────────────────────────────────────────────────────────
@@ -453,7 +457,8 @@ namespace BusCheckInV2.ViewModels
         [RelayCommand]
         private async Task ValidarYFinalizarFleteAsync(FletePendienteUI flete)
         {
-            if (flete == null) return;
+            if (flete == null || _finalizandoEnCurso) return;
+            _finalizandoEnCurso = true;
 
             var cantidad = await _alertService.ShowPromptAsync(
                 "Validar Flete",
@@ -491,11 +496,23 @@ namespace BusCheckInV2.ViewModels
 
                 if (exito)
                 {
-                    await _databaseService.ActualizarEstadoFleteAsync(
-                        flete.Id, "Completado", cantidadValidada, observaciones);
+                    await _databaseService.ActualizarEstadoFleteAsync(flete.Id, "Completado", cantidadValidada, observaciones);
                     flete.Estatus = "Completado";
                     flete.CantidadReal = cantidadValidada;
                     flete.FechaFin = DateTime.Now;
+
+                    // FIX: recalcular o forzar EsPendiente a false
+                    // Opción A: si tienes setter en EsPendiente, haz flete.EsPendiente = false;
+                    // Opción B: removerlo de la lista visible porque ya no es pendiente.
+                    if (MostrarSoloPendientes)
+                    {
+                        FletesPendientes.Remove(flete);
+                    }
+                    else
+                    {
+                        flete.EsPendiente = false; // Asegúrate de que la propiedad tenga setter público.
+                    }
+
 
                     await _alertService.ShowAlertAsync(
                         "Éxito",
@@ -507,6 +524,7 @@ namespace BusCheckInV2.ViewModels
             finally
             {
                 EstaCargando = false;
+                _finalizandoEnCurso = false;
             }
         }
 
@@ -526,9 +544,13 @@ namespace BusCheckInV2.ViewModels
                 }
 
                 var sincronizados = await _databaseService.SincronizarConApiAsync(_apiService);
-                await _alertService.ShowAlertAsync(
-                    "Sincronización",
-                    $"Completada. {sincronizados} fletes sincronizados");
+                await _alertService.ShowAlertAsync("Sincronización", $"Completada. {sincronizados} fletes sincronizados");
+
+                // NUEVO: Recargar fletes automáticamente
+                if (!_cargaFletesEnCurso)
+                {
+                    await CargarFletesPendientesAsync();
+                }
             }
             catch (Exception ex)
             {

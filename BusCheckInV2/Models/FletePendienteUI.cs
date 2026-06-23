@@ -1,9 +1,10 @@
-﻿using System;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
+using System;
 using System.ComponentModel;
 
 namespace BusCheckInV2.Models
 {
-    public class FletePendienteUI : INotifyPropertyChanged
+    public partial class FletePendienteUI : ObservableObject
     {
         private int _id;
         private int? _idFletePer;
@@ -48,6 +49,7 @@ namespace BusCheckInV2.Models
         //   PERO: el setter permite que el ViewModel lo sobreescriba
         //   con el valor derivado que viene del backend (más confiable).
         private bool _esPendiente;
+        private bool _esPendienteAsignado;
 
         public int Id
         {
@@ -195,7 +197,6 @@ namespace BusCheckInV2.Models
                 OnPropertyChanged();
             }
         }
-        private bool _esPendienteAsignado;
 
         public string DuracionViaje
         {

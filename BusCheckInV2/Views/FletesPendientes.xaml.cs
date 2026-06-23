@@ -47,22 +47,13 @@ namespace BusCheckInV2.Views
             }
         }
 
-        //protected override void OnDisappearing()
-        //{
-        //    base.OnDisappearing();
-        //    if (BindingContext is IDisposable disposable)
-        //        disposable.Dispose();
-        //}
-
-        //protected override void OnDisappearing()
-        //{
-        //    base.OnDisappearing();
-        //    // Al salir de la pantalla liberamos el ViewModel
-        //    // para cancelar suscripciones a Connectivity
-        //    if (BindingContext is FletesPendientesViewModel viewModel)
-        //    {
-        //        viewModel.Dispose();
-        //    }
-        //}
+        protected override void OnDisappearing()
+        {
+            base.OnDisappearing();
+            if (BindingContext is FletesPendientesViewModel viewModel)
+            {
+                viewModel.Dispose();
+            }
+        }
     }
 }

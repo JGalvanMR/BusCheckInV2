@@ -16,7 +16,7 @@ namespace BusCheckInV2
             _databaseService = databaseService;
             _appUpdateService = appUpdateService;
 
-            MainPage = new AppShell();
+            MainPage = new AppShell(_appUpdateService);
         }
         protected override async void OnStart()
         {

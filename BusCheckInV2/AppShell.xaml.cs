@@ -7,7 +7,7 @@ namespace BusCheckInV2
     public partial class AppShell : Shell
     {
         private readonly IAppUpdateService _appUpdateService;
-        public AppShell(IAppUpdateService appUpdateService = null)
+        public AppShell(IAppUpdateService appUpdateService)
         {
             InitializeComponent();
             _appUpdateService = appUpdateService;

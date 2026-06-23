@@ -243,7 +243,7 @@
                                         LineBreakMode="WordWrap"
                                         Text="{Binding Ruta}" />
                                     <Label
-                                        FontSize="12"
+                                        FontSize="16"
                                         Text="{Binding FechaHora, StringFormat='{0:dd/MM/yyyy HH:mm}'}"
                                         TextColor="Gray" />
                                 </VerticalStackLayout>
@@ -382,13 +382,13 @@
         </Border>
 
         <!--  ActivityIndicator  -->
-        <ActivityIndicator
+        <!--<ActivityIndicator
             Grid.RowSpan="5"
             HorizontalOptions="Center"
             IsRunning="{Binding EstaCargando}"
             IsVisible="{Binding EstaCargando}"
             Scale="1.6"
             VerticalOptions="Center"
-            Color="#2196F3" />
+            Color="#2196F3" />-->
     </Grid>
 </ContentPage>
