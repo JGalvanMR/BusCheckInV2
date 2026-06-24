@@ -19,5 +19,14 @@ namespace BusCheckInV2
 
             CurrentItem = shellSeleccionDeFlete;
         }
+        protected override async void OnAppearing()
+        {
+            base.OnAppearing();
+            // Ejemplo: Chequea updates si inyectaste el servicio
+            if (_appUpdateService != null)
+            {
+                await _appUpdateService.IsUpdateAvailableAsync(); // Asume un método en el servicio
+            }
+        }
     }
 }

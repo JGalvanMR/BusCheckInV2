@@ -2,6 +2,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 
 namespace BusCheckInV2.Models
@@ -118,6 +119,25 @@ namespace BusCheckInV2.Models
             }
         }
 
+        public Color ColorDiaSemana => ObtenerColorPorDia(FechaHora.DayOfWeek);
+
+        private static Color ObtenerColorPorDia(DayOfWeek dia)
+        {
+            return dia switch
+            {
+                DayOfWeek.Monday => Color.FromArgb("#FF3B30"),  // Rojo
+                DayOfWeek.Tuesday => Color.FromArgb("#FF9500"),  // Naranja
+                DayOfWeek.Wednesday => Color.FromArgb("#FFCC00"),  // Amarillo
+                DayOfWeek.Thursday => Color.FromArgb("#34C759"),  // Verde
+                DayOfWeek.Friday => Color.FromArgb("#007AFF"),  // Azul
+                DayOfWeek.Saturday => Color.FromArgb("#5856D6"),  // Índigo
+                DayOfWeek.Sunday => Color.FromArgb("#AF52DE"),  // Violeta
+                _ => Colors.Gray,
+            };
+        }
+
+        public string DiaSemana => FechaHora > DateTime.MinValue ? FechaHora.ToString("ddd", new CultureInfo("es-ES")) : "---";
+
         // ─── PROPIEDAD CALCULADA: Duración del viaje ────────────────────
         public string DuracionViaje
         {
@@ -210,6 +230,7 @@ namespace BusCheckInV2.Models
             if (status == "A" && tieneInicio)
                 return "Pendiente";
             return "Activo";
+
         }
     }
 }

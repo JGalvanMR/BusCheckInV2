@@ -30,8 +30,9 @@ namespace BusCheckInV2.Converters
                 var s = status.Trim();
 
                 // Camino 1 (preferido): EstadoCalculado del backend nuevo
-                if (s.Equals("Activo", StringComparison.OrdinalIgnoreCase) ||
-                    s.Equals("En curso", StringComparison.OrdinalIgnoreCase) ||
+                if (s.Equals("Activo", StringComparison.OrdinalIgnoreCase))
+                    return Colors.Green;
+                if (s.Equals("En curso", StringComparison.OrdinalIgnoreCase) ||
                     s.Equals("Pendiente", StringComparison.OrdinalIgnoreCase))
                     return Colors.Red;
                 if (s.Equals("Finalizado", StringComparison.OrdinalIgnoreCase))
@@ -40,7 +41,9 @@ namespace BusCheckInV2.Converters
                     return Colors.Gray;
 
                 // Camino 2: códigos 1 char (Status='P'/'I'/'A'/'F'/'C')
-                if (s == "P" || s == "I" || s == "A")
+                if (s == "A")
+                    return Colors.Green;
+                if (s == "P" || s == "I")
                     return Colors.Red;
                 if (s == "F")
                     return Colors.Green;
@@ -48,10 +51,11 @@ namespace BusCheckInV2.Converters
                     return Colors.Gray;
 
                 // Camino 3: fallback a strings legacy
+                if (s.Contains("Activo", StringComparison.OrdinalIgnoreCase))
+                    return Colors.Green;
                 if (s.Contains("Pendiente", StringComparison.OrdinalIgnoreCase) ||
                     s.Contains("Iniciado", StringComparison.OrdinalIgnoreCase) ||
                     s.Contains("Inconcluso", StringComparison.OrdinalIgnoreCase) ||
-                    s.Contains("Activo", StringComparison.OrdinalIgnoreCase) ||
                     s.Contains("Aprobado", StringComparison.OrdinalIgnoreCase))
                     return Colors.Red;
                 if (s.Contains("Finalizado", StringComparison.OrdinalIgnoreCase) ||
@@ -222,5 +226,20 @@ namespace BusCheckInV2.Converters
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
             => value is bool b && !b;
+    }
+    public class DiaSemanaColorConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is DateTime fecha)
+            {
+                if (fecha.DayOfWeek == DayOfWeek.Saturday || fecha.DayOfWeek == DayOfWeek.Sunday)
+                    return Color.FromRgba(255, 0, 0, 50); // Rojo con transparencia
+            }
+            return Color.FromRgba(0, 0, 0, 0); // Transparente
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            => throw new NotImplementedException();
     }
 }

@@ -18,6 +18,7 @@
             <converters:StatusToColorConverter x:Key="StatusToColorConverter" />
             <converters:IntToBoolConverter x:Key="IntToBoolConverter" />
             <converters:InverseIntToBoolConverter x:Key="InverseIntToBoolConverter" />
+            <converters:DiaSemanaColorConverter x:Key="DiaSemanaColorConverter" />
 
             <Style x:Key="CardBorder" TargetType="Border">
                 <Setter Property="Padding" Value="12" />
@@ -125,40 +126,41 @@
                         ItemsSource="{Binding ListaUsuarios}"
                         SelectedItem="{Binding UsuarioSeleccionado}" />
 
-                    <!--  Fila 2: Switch solo pendientes + días filtro  -->
-                    <HorizontalStackLayout
+                    <!--  Fila 2: Título de semana + Switch Solo pendientes  -->
+                    <Grid
                         Grid.Row="2"
                         Grid.Column="0"
                         Grid.ColumnSpan="2"
-                        Spacing="10"
+                        ColumnDefinitions="*,Auto"
+                        ColumnSpacing="10"
                         VerticalOptions="Center">
-                        <HorizontalStackLayout Spacing="6" VerticalOptions="Center">
-                            <!--
-                                FIX 2026-06-04: agregamos Toggled event para que
-                                el cambio del switch recargue la lista
-                                inmediatamente, sin tener que pulsar "Actualizar".
-                                El binding IsToggled ya actualiza la propiedad
-                                MostrarSoloPendientes en el VM (TwoWay por
-                                defecto), pero NO dispara el comando de carga.
-                                El handler OnMostrarSoloPendientesChanged en
-                                FletesPendientes.xaml.cs hace el ExecuteAsync
-                                del comando.
-                            -->
+
+                        <Label
+                            Grid.Column="0"
+                            FontAttributes="Bold"
+                            FontSize="14"
+                            LineBreakMode="TailTruncation"
+                            Text="{Binding TituloSemanaActual}"
+                            TextColor="{AppThemeBinding Light=#1A1A2E,
+                                                        Dark=#E0E0E0}"
+                            VerticalOptions="Center" />
+
+                        <HorizontalStackLayout
+                            Grid.Column="1"
+                            Spacing="6"
+                            VerticalOptions="Center">
+
                             <Switch
                                 IsToggled="{Binding MostrarSoloPendientes}"
-                                Scale="0.9"
+                                Scale="0.85"
                                 Toggled="OnMostrarSoloPendientesChanged" />
+
                             <Label
                                 FontSize="12"
                                 Text="Solo pendientes"
                                 VerticalOptions="Center" />
                         </HorizontalStackLayout>
-                        <Label
-                            FontSize="11"
-                            Text="{Binding DiasFiltro, StringFormat='Últimos {0} días'}"
-                            TextColor="Gray"
-                            VerticalOptions="Center" />
-                    </HorizontalStackLayout>
+                    </Grid>
 
                     <!--  Fila 3: Botón Actualizar  -->
                     <!--  ─── FIX: CargarFletesComando → CargarFletesPendientesCommand  -->
@@ -179,7 +181,7 @@
 
         <!--  Mensaje de estado  -->
         <Label
-            Grid.Row="2"
+            Grid.Row="1"
             Margin="10,5"
             FontSize="12"
             HorizontalOptions="Center"
@@ -188,6 +190,7 @@
             VerticalOptions="Start" />
 
         <!--  ===================== LISTA DE FLETES =====================  -->
+        <!--  ─── FIX: CargarFletesComando → CargarFletesPendientesCommand  -->
         <!--  ─── FIX: CargarFletesComando → CargarFletesPendientesCommand  -->
         <RefreshView
             Grid.Row="3"
@@ -231,26 +234,48 @@
                             </Border.Shadow>
 
                             <Grid
-                                ColumnDefinitions="*,Auto"
+                                ColumnDefinitions="Auto,*,Auto"
                                 RowDefinitions="Auto,Auto,Auto"
                                 RowSpacing="8">
 
-                                <!--  Fila 0: Ruta y Fecha  -->
-                                <VerticalStackLayout Grid.Row="0" Grid.Column="0">
+                                <!--  ===== CINTILLA DEL DÍA =====  -->
+                                <Border
+                                    Grid.RowSpan="3"
+                                    Grid.Column="0"
+                                    Margin="0,0,8,0"
+                                    Padding="8,4"
+                                    BackgroundColor="{Binding ColorDiaSemana}"
+                                    VerticalOptions="Fill">
+                                    <Border.StrokeShape>
+                                        <RoundRectangle CornerRadius="6,0,0,6" />
+                                    </Border.StrokeShape>
                                     <Label
                                         FontAttributes="Bold"
-                                        FontSize="16"
+                                        FontSize="12"
+                                        HorizontalOptions="Center"
+                                        Text="{Binding DiaSemana}"
+                                        TextColor="{AppThemeBinding Light=#1A1A2E,
+                                                                    Dark=#E0E0E0}"
+                                        VerticalOptions="Center" />
+                                </Border>
+
+                                <!--  Fila 0: Ruta y Fecha  -->
+                                <VerticalStackLayout Grid.Row="0" Grid.Column="1">
+                                    <Label
+                                        FontAttributes="Bold"
+                                        FontSize="17"
                                         LineBreakMode="WordWrap"
                                         Text="{Binding Ruta}" />
                                     <Label
-                                        FontSize="16"
+                                        FontSize="17"
                                         Text="{Binding FechaHora, StringFormat='{0:dd/MM/yyyy HH:mm}'}"
                                         TextColor="Gray" />
                                 </VerticalStackLayout>
 
+                                <!--  Cantidad de pasajeros (columna 2)  -->
                                 <Grid
                                     Grid.Row="0"
-                                    Grid.Column="1"
+                                    Grid.Column="2"
                                     ColumnDefinitions="Auto,Auto">
                                     <Label
                                         Grid.Column="0"
@@ -268,6 +293,7 @@
                                 <!--  Fila 1: Chofer y Estado  -->
                                 <Grid
                                     Grid.Row="1"
+                                    Grid.Column="1"
                                     Grid.ColumnSpan="2"
                                     ColumnDefinitions="*,Auto">
                                     <Label
@@ -276,25 +302,26 @@
                                         Text="{Binding Chofer}" />
                                     <Border
                                         Grid.Column="1"
-                                        Padding="8,4"
+                                        Padding="10,5"
                                         BackgroundColor="{Binding Estatus, Converter={StaticResource StatusToColorConverter}}">
                                         <Border.StrokeShape>
                                             <RoundRectangle CornerRadius="16" />
                                         </Border.StrokeShape>
                                         <Label
                                             FontAttributes="Bold"
-                                            FontSize="11"
+                                            FontSize="12"
                                             Text="{Binding Estatus}"
                                             TextColor="White" />
                                     </Border>
                                 </Grid>
 
-                                <!--  Fila 2: Botones  -->
+                                <!--  Fila 2: Botones (ocupa columnas 1 y 2)  -->
                                 <Grid
                                     Grid.Row="2"
+                                    Grid.Column="1"
                                     Grid.ColumnSpan="2"
                                     ColumnDefinitions="*,*"
-                                    ColumnSpacing="5">
+                                    ColumnSpacing="8">
 
                                     <!--  ─── FIX: VerDetalleComando → VerDetalleFleteCommand  -->
                                     <Button
@@ -303,6 +330,7 @@
                                         Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.VerDetalleFleteCommand}"
                                         CommandParameter="{Binding .}"
                                         CornerRadius="20"
+                                        FontSize="14"
                                         Text="Detalle"
                                         TextColor="#2196F3" />
 
@@ -341,10 +369,12 @@
                                         Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ValidarYFinalizarFleteCommand}"
                                         CommandParameter="{Binding .}"
                                         CornerRadius="20"
+                                        FontSize="14"
                                         IsVisible="{Binding EsPendiente}"
                                         Text="Cerrar Flete"
                                         TextColor="White" />
                                 </Grid>
+
                             </Grid>
                         </Border>
                     </DataTemplate>

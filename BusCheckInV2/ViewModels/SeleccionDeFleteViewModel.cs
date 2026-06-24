@@ -336,7 +336,7 @@ namespace BusCheckInV2.ViewModels
                 bool userWantsToUpdate = await Application.Current.MainPage.DisplayAlert(
                     "Actualización Disponible",
                     "Hay una nueva versión de la aplicación disponible. ¿Deseas actualizar?",
-                    "Sí", "No");
+                    "OK","");
                 if (userWantsToUpdate)
                 {
                     await _appUpdateService.DownloadAndInstallAsync();

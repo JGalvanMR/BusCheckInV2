@@ -12,7 +12,7 @@ namespace BusCheckInV2.Services
     {
         private readonly HttpClient _httpClient;
         private readonly IVersionService _versionService;
-        private const string VersionUrl = "http://189.206.160.206:81/EmbarquesApk/BusCheckIn/version.txt"; // JSON con { "versionCode": "42", "versionName": "1.0.0", "downloadURL": "url" }
+        private const string VersionUrl = "http://189.206.160.206:81/EmbarquesApk/BusCheckInV2/version.txt"; // JSON con { "versionCode": "42", "versionName": "1.0.0", "downloadURL": "url" }
 
         public AppUpdateService(HttpClient httpClient, IVersionService versionService)
         {
@@ -59,7 +59,7 @@ namespace BusCheckInV2.Services
 
         private async Task DownloadAndInstallAndroidAsync()
         {
-            string apkUrl = "http://189.206.160.206:81/EmbarquesApk/BusCheckIn/com.mrlucky.buscheckinV2.apk";
+            string apkUrl = "http://189.206.160.206:81/EmbarquesApk/BusCheckInV2/com.mrlucky.buscheckinV2.apk";
             string apkName = "com.mrlucky.buscheckinV2.apk";
 
             try

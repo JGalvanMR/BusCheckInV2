@@ -128,6 +128,9 @@ namespace BusCheckInV2.ViewModels
         // de conexión. Lo mantenemos sincronizado con HayConexionInternet.
         [ObservableProperty]
         private Color _colorEstadoConexion = Colors.Orange;
+
+
+
         // ─────────────────────────────────────────────────────────────────
 
         // ─── CONSTRUCTOR SIN CAMBIOS ──────────────────────────────────────
@@ -214,8 +217,10 @@ namespace BusCheckInV2.ViewModels
         // Genera el comando: CargarFletesPendientesCommand
         // El XAML debe usar: CargarFletesPendientesCommand
         [RelayCommand]
-        private async Task CargarFletesPendientesAsyncOG()
+        private async Task CargarFletesPendientesAsync()
         {
+            var (inicioSemana, finSemana) = ObtenerSemanaActual();
+            TituloSemanaActual = $"📅 {inicioSemana:ddd dd} / {finSemana:ddd dd} {finSemana:MMM yyyy}";
             // ChoferSeleccionado se actualiza automáticamente desde UsuarioSeleccionado
             if (string.IsNullOrEmpty(ChoferSeleccionado))
             {
@@ -388,128 +393,6 @@ namespace BusCheckInV2.ViewModels
 
                 var total = FletesPendientes.Count;
                 var pendientes = FletesPendientes.Count(EsFletePendiente);
-                MensajeEstado = $"Mostrando {total} fletes ({pendientes} pendientes)";
-            }
-            catch (Exception ex)
-            {
-                MensajeEstado = $"Error: {ex.Message}";
-            }
-            finally
-            {
-                EstaCargando = false;
-                _cargaFletesEnCurso = false;
-            }
-        }
-        [ObservableProperty]
-        private ObservableCollection<GrupoFlete> _fletesAgrupados = new();
-        [RelayCommand]
-        private async Task CargarFletesPendientesAsync()
-        {
-            if (string.IsNullOrEmpty(ChoferSeleccionado))
-            {
-                MensajeEstado = "Seleccione un chofer primero";
-                return;
-            }
-
-            if (_cargaFletesEnCurso) return;
-            _cargaFletesEnCurso = true;
-
-            try
-            {
-                EstaCargando = true;
-                MensajeEstado = "Cargando fletes...";
-                FletesPendientes.Clear(); // Nueva colección agrupada
-
-                // ─── 1. Obtener semana actual (para título y posible filtro local) ──
-                var (inicioSemana, finSemana) = ObtenerSemanaActual();
-                TituloSemanaActual = $"📅 Semana en curso ({inicioSemana:dd/MM/yyyy} - {finSemana:dd/MM/yyyy})";
-
-                List<FletePendienteUI> fletes = new();
-
-                // ─── 2. Cargar desde API o caché ─────────────────────────────────────
-                if (HayConexionInternet && _apiService != null)
-                {
-                    // El backend filtra por semana actual; el parámetro 'dias' es ignorado
-                    var apiResponse = await _apiService.ObtenerFletesPorChoferAsync(
-                        ChoferSeleccionado, 7, MostrarSoloPendientes);
-
-                    if (apiResponse?.Success == true && apiResponse.Data?.Any() == true)
-                    {
-                        // ─── Guardar en BD local (para tener ID) ──────────────────
-                        foreach (var f in apiResponse.Data)
-                        {
-                            // Verificar si ya existe localmente
-                            var existe = await _databaseService.ObtenerIdLocalPorIdFletePerAsync(f.IdFletePer);
-                            if (!existe.HasValue)
-                            {
-                                // Crear objeto UI temporal para insertar
-                                var tempUI = new FletePendienteUI
-                                {
-                                    IdFletePer = f.IdFletePer,
-                                    Ruta = f.RutaNombre,
-                                    FechaHora = ParseFechaHora(f.Fecha, f.Hora),
-                                    Proveedor = f.ProveedorNombre,
-                                    Chofer = f.Chofer,
-                                    Estatus = f.Estatus,
-                                    CantidadEsperada = f.Cantidad,
-                                    TipoFlete = f.TipoFlete,
-                                    TipoViaje = f.TipoViaje,
-                                    CantidadReal = f.CantidadReal,
-                                    FechaInicio = f.FechaInicio,
-                                    FechaFin = f.FechaFin,
-                                    CantPasajeros = f.CantPasajeros,
-                                    UltimaFechaDetalle = f.UltimaFechaDetalle,
-                                    // Usar los campos calculados que ya vienen del backend
-                                    EstadoCalculado = f.EstadoCalculado,
-                                    EsPendiente = f.EsPendiente == 1 // int a bool
-                                };
-                                await _databaseService.InsertarFleteDesdeUIAsync(tempUI);
-                            }
-                        }
-
-                        // ─── Leer desde la BD local (ahora con IDs) ──────────────
-                        // Usamos el método existente con 7 días (pero el backend ya filtró)
-                        fletes = await _databaseService.ObtenerFletesPendientesDesdeCacheAsync(
-                            ChoferSeleccionado, 7);
-                    }
-                    else
-                    {
-                        // Si la API no devuelve datos, usar caché local
-                        fletes = await _databaseService.ObtenerFletesPendientesDesdeCacheAsync(
-                            ChoferSeleccionado, 7);
-                        MensajeEstado = "API sin datos. Mostrando locales.";
-                    }
-                }
-                else
-                {
-                    // Modo offline
-                    fletes = await _databaseService.ObtenerFletesPendientesDesdeCacheAsync(
-                        ChoferSeleccionado, 7);
-                    MensajeEstado = "Modo offline — datos locales";
-                }
-
-                // ─── 3. Aplicar filtro "Solo pendientes" (por si acaso) ─────────────
-                // El backend ya aplica el filtro si MostrarSoloPendientes=true,
-                // pero lo dejamos por seguridad.
-                if (MostrarSoloPendientes)
-                {
-                    fletes = fletes.Where(f => f.EsPendiente).ToList();
-                }
-
-                // ─── 4. Agrupar por semana (usando ObtenerInicioSemana) ─────────────
-                var grupos = fletes
-                    .GroupBy(f => ObtenerInicioSemana(f.FechaHora))
-                    .OrderByDescending(g => g.Key)
-                    .Select(g => new GrupoFlete(
-                        ObtenerTituloSemana(g.Key),
-                        g.OrderByDescending(f => f.FechaHora)))
-                    .ToList();
-
-                foreach (var grupo in grupos)
-                    FletesAgrupados.Add(grupo);
-
-                var total = fletes.Count;
-                var pendientes = fletes.Count(f => f.EsPendiente);
                 MensajeEstado = $"Mostrando {total} fletes ({pendientes} pendientes)";
             }
             catch (Exception ex)
@@ -890,7 +773,9 @@ namespace BusCheckInV2.ViewModels
         private string ObtenerTituloSemana(DateTime inicio)
         {
             var fin = inicio.AddDays(6);
-            return $"📅 Semana del {inicio:dd/MM/yyyy} al {fin:dd/MM/yyyy}";
+            //return $"📅 \n Semana del {inicio:dd/MM/yyyy} al {fin:dd/MM/yyyy}";
+            // Se adaptará automáticamente según la cultura del dispositivo
+            return $"📅 Semana del {inicio:d} al {fin:d}";
         }
     }
     public class GrupoFlete : ObservableCollection<FletePendienteUI>
