@@ -27,6 +27,8 @@ namespace BusCheckInV2.ViewModels
         private readonly CancellationTokenSource _gpsTokenSource = new();
         private bool _disposed;
         private bool _finalizandoEnCurso;
+        [ObservableProperty]
+        private string _tituloSemanaActual = string.Empty;
 
         // FIX 2026-06-01 (Problema #3b del usuario): previene que el botón
         // Actualizar y el pull-to-refresh del RefreshView disparen dos cargas
@@ -212,7 +214,7 @@ namespace BusCheckInV2.ViewModels
         // Genera el comando: CargarFletesPendientesCommand
         // El XAML debe usar: CargarFletesPendientesCommand
         [RelayCommand]
-        private async Task CargarFletesPendientesAsync()
+        private async Task CargarFletesPendientesAsyncOG()
         {
             // ChoferSeleccionado se actualiza automáticamente desde UsuarioSeleccionado
             if (string.IsNullOrEmpty(ChoferSeleccionado))
@@ -233,6 +235,7 @@ namespace BusCheckInV2.ViewModels
                 EstaCargando = true;
                 MensajeEstado = "Cargando fletes...";
                 FletesPendientes.Clear();
+
 
                 var fletes = new System.Collections.Generic.List<FletePendienteUI>();
 
@@ -397,6 +400,128 @@ namespace BusCheckInV2.ViewModels
                 _cargaFletesEnCurso = false;
             }
         }
+        [ObservableProperty]
+        private ObservableCollection<GrupoFlete> _fletesAgrupados = new();
+        [RelayCommand]
+        private async Task CargarFletesPendientesAsync()
+        {
+            if (string.IsNullOrEmpty(ChoferSeleccionado))
+            {
+                MensajeEstado = "Seleccione un chofer primero";
+                return;
+            }
+
+            if (_cargaFletesEnCurso) return;
+            _cargaFletesEnCurso = true;
+
+            try
+            {
+                EstaCargando = true;
+                MensajeEstado = "Cargando fletes...";
+                FletesPendientes.Clear(); // Nueva colección agrupada
+
+                // ─── 1. Obtener semana actual (para título y posible filtro local) ──
+                var (inicioSemana, finSemana) = ObtenerSemanaActual();
+                TituloSemanaActual = $"📅 Semana en curso ({inicioSemana:dd/MM/yyyy} - {finSemana:dd/MM/yyyy})";
+
+                List<FletePendienteUI> fletes = new();
+
+                // ─── 2. Cargar desde API o caché ─────────────────────────────────────
+                if (HayConexionInternet && _apiService != null)
+                {
+                    // El backend filtra por semana actual; el parámetro 'dias' es ignorado
+                    var apiResponse = await _apiService.ObtenerFletesPorChoferAsync(
+                        ChoferSeleccionado, 7, MostrarSoloPendientes);
+
+                    if (apiResponse?.Success == true && apiResponse.Data?.Any() == true)
+                    {
+                        // ─── Guardar en BD local (para tener ID) ──────────────────
+                        foreach (var f in apiResponse.Data)
+                        {
+                            // Verificar si ya existe localmente
+                            var existe = await _databaseService.ObtenerIdLocalPorIdFletePerAsync(f.IdFletePer);
+                            if (!existe.HasValue)
+                            {
+                                // Crear objeto UI temporal para insertar
+                                var tempUI = new FletePendienteUI
+                                {
+                                    IdFletePer = f.IdFletePer,
+                                    Ruta = f.RutaNombre,
+                                    FechaHora = ParseFechaHora(f.Fecha, f.Hora),
+                                    Proveedor = f.ProveedorNombre,
+                                    Chofer = f.Chofer,
+                                    Estatus = f.Estatus,
+                                    CantidadEsperada = f.Cantidad,
+                                    TipoFlete = f.TipoFlete,
+                                    TipoViaje = f.TipoViaje,
+                                    CantidadReal = f.CantidadReal,
+                                    FechaInicio = f.FechaInicio,
+                                    FechaFin = f.FechaFin,
+                                    CantPasajeros = f.CantPasajeros,
+                                    UltimaFechaDetalle = f.UltimaFechaDetalle,
+                                    // Usar los campos calculados que ya vienen del backend
+                                    EstadoCalculado = f.EstadoCalculado,
+                                    EsPendiente = f.EsPendiente == 1 // int a bool
+                                };
+                                await _databaseService.InsertarFleteDesdeUIAsync(tempUI);
+                            }
+                        }
+
+                        // ─── Leer desde la BD local (ahora con IDs) ──────────────
+                        // Usamos el método existente con 7 días (pero el backend ya filtró)
+                        fletes = await _databaseService.ObtenerFletesPendientesDesdeCacheAsync(
+                            ChoferSeleccionado, 7);
+                    }
+                    else
+                    {
+                        // Si la API no devuelve datos, usar caché local
+                        fletes = await _databaseService.ObtenerFletesPendientesDesdeCacheAsync(
+                            ChoferSeleccionado, 7);
+                        MensajeEstado = "API sin datos. Mostrando locales.";
+                    }
+                }
+                else
+                {
+                    // Modo offline
+                    fletes = await _databaseService.ObtenerFletesPendientesDesdeCacheAsync(
+                        ChoferSeleccionado, 7);
+                    MensajeEstado = "Modo offline — datos locales";
+                }
+
+                // ─── 3. Aplicar filtro "Solo pendientes" (por si acaso) ─────────────
+                // El backend ya aplica el filtro si MostrarSoloPendientes=true,
+                // pero lo dejamos por seguridad.
+                if (MostrarSoloPendientes)
+                {
+                    fletes = fletes.Where(f => f.EsPendiente).ToList();
+                }
+
+                // ─── 4. Agrupar por semana (usando ObtenerInicioSemana) ─────────────
+                var grupos = fletes
+                    .GroupBy(f => ObtenerInicioSemana(f.FechaHora))
+                    .OrderByDescending(g => g.Key)
+                    .Select(g => new GrupoFlete(
+                        ObtenerTituloSemana(g.Key),
+                        g.OrderByDescending(f => f.FechaHora)))
+                    .ToList();
+
+                foreach (var grupo in grupos)
+                    FletesAgrupados.Add(grupo);
+
+                var total = fletes.Count;
+                var pendientes = fletes.Count(f => f.EsPendiente);
+                MensajeEstado = $"Mostrando {total} fletes ({pendientes} pendientes)";
+            }
+            catch (Exception ex)
+            {
+                MensajeEstado = $"Error: {ex.Message}";
+            }
+            finally
+            {
+                EstaCargando = false;
+                _cargaFletesEnCurso = false;
+            }
+        }
 
         // FIX 2026-06-03 (Opción A): simplificación del helper de pendiente.
         // Ahora la fuente de verdad es EstadoCalculado (string fino que
@@ -455,7 +580,7 @@ namespace BusCheckInV2.ViewModels
         // ─── COMANDOS RESTANTES SIN CAMBIOS DE LÓGICA ────────────────────
 
         [RelayCommand]
-        private async Task ValidarYFinalizarFleteAsync(FletePendienteUI flete)
+        private async Task ValidarYFinalizarFleteAsyncOG(FletePendienteUI flete)
         {
             if (flete == null || _finalizandoEnCurso) return;
             _finalizandoEnCurso = true;
@@ -496,7 +621,7 @@ namespace BusCheckInV2.ViewModels
 
                 if (exito)
                 {
-                    await _databaseService.ActualizarEstadoFleteAsync(flete.Id, "Completado", cantidadValidada, observaciones);
+                    await _databaseService.ActualizarEstadoFleteAsync((int)flete.Id, "Completado", cantidadValidada, observaciones);
                     flete.Estatus = "Completado";
                     flete.CantidadReal = cantidadValidada;
                     flete.FechaFin = DateTime.Now;
@@ -520,6 +645,123 @@ namespace BusCheckInV2.ViewModels
                             ? "Flete finalizado en servidor"
                             : "Flete finalizado localmente");
                 }
+            }
+            finally
+            {
+                EstaCargando = false;
+                _finalizandoEnCurso = false;
+            }
+        }
+
+        [RelayCommand]
+        private async Task ValidarYFinalizarFleteAsync(FletePendienteUI flete)
+        {
+            if (flete == null || _finalizandoEnCurso) return;
+            _finalizandoEnCurso = true;
+
+            try
+            {
+                // 1. Verificar que el flete tenga ID del backend (indispensable)
+                if (!flete.IdFletePer.HasValue)
+                {
+                    await _alertService.ShowAlertAsync("Error", "El flete no tiene ID en el servidor.");
+                    return;
+                }
+
+                // 2. Pedir cantidad
+                var cantidad = await _alertService.ShowPromptAsync(
+                    "Validar Flete",
+                    $"Ingrese cantidad real para:\n{flete.Ruta}\n(Esperados: {flete.CantidadEsperada})",
+                    keyboard: Keyboard.Numeric);
+
+                if (string.IsNullOrEmpty(cantidad) || !int.TryParse(cantidad, out int cantidadValidada))
+                    return;
+
+                var observaciones = await _alertService.ShowPromptAsync(
+                    "Observaciones",
+                    "Ingrese observaciones (opcional):",
+                    placeholder: "Observaciones del viaje...");
+
+                var confirmar = await _alertService.ShowConfirmationAsync(
+                    "Confirmar Finalización",
+                    $"¿Finalizar flete con {cantidadValidada} pasajeros?\n{flete.Ruta}");
+
+                if (!confirmar) return;
+
+                EstaCargando = true;
+
+                // 3. Asegurar que el flete tiene ID local (crearlo si no existe)
+                if (!flete.Id.HasValue)
+                {
+                    // Intentar buscar en BD local por IdFletePer
+                    var localId = await _databaseService.ObtenerIdLocalPorIdFletePerAsync(flete.IdFletePer.Value);
+                    if (localId.HasValue)
+                    {
+                        flete.Id = localId.Value;
+                    }
+                    else
+                    {
+                        // Insertar nuevo registro local desde el objeto UI
+                        var nuevoId = await _databaseService.InsertarFleteDesdeUIAsync(flete);
+                        if (nuevoId > 0)
+                            flete.Id = nuevoId;
+                        else
+                        {
+                            await _alertService.ShowAlertAsync("Error", "No se pudo guardar el flete localmente.");
+                            return;
+                        }
+                    }
+                }
+
+                // 4. Obtener GPS
+                var (lat, lon) = await GetLatLonOrZeroAsync();
+
+                // 5. Finalizar en servidor (si hay conexión)
+                bool exito = true;
+                if (HayConexionInternet && _apiService != null)
+                {
+                    exito = await _apiService.ValidarYFinalizarFleteAsync(
+                        flete.IdFletePer.Value,
+                        cantidadValidada,
+                        observaciones ?? "",
+                        lat,
+                        lon);
+                }
+
+                if (exito)
+                {
+                    // 6. Actualizar BD local (usando Id local ya seguro)
+                    await _databaseService.ActualizarEstadoFleteAsync(
+                        flete.Id.Value,
+                        "Completado",
+                        cantidadValidada,
+                        observaciones);
+
+                    // 7. Actualizar objeto UI
+                    flete.Estatus = "Completado";
+                    flete.CantidadReal = cantidadValidada;
+                    flete.FechaFin = DateTime.Now;
+                    flete.EstadoCalculado = "Finalizado";
+                    flete.EsPendiente = false;
+
+                    // 8. Si estamos en "Solo pendientes", remover de la lista
+                    if (MostrarSoloPendientes)
+                        FletesPendientes.Remove(flete);
+
+                    await _alertService.ShowAlertAsync(
+                        "Éxito",
+                        HayConexionInternet
+                            ? "Flete finalizado en servidor y localmente"
+                            : "Flete finalizado localmente (se sincronizará después)");
+                }
+                else
+                {
+                    await _alertService.ShowAlertAsync("Error", "No se pudo finalizar el flete en el servidor.");
+                }
+            }
+            catch (Exception ex)
+            {
+                await _alertService.ShowAlertAsync("Error", $"Error al finalizar: {ex.Message}");
             }
             finally
             {
@@ -621,10 +863,43 @@ namespace BusCheckInV2.ViewModels
             }
             catch { /* ya disposed, ignorar */ }
         }
-        //public override void Dispose()
-        //{
-        //    Connectivity.ConnectivityChanged -= OnConnectivityChanged;
-        //    base.Dispose();
-        //}
+
+        // ─── NUEVO MÉTODO: Obtener semana actual (Lunes a Domingo) ────────
+        private (DateTime Inicio, DateTime Fin) ObtenerSemanaActual()
+        {
+            var hoy = DateTime.Now.Date;
+            int diff = (int)hoy.DayOfWeek - (int)DayOfWeek.Monday;
+            if (diff < 0) diff += 7;
+            DateTime lunes = hoy.AddDays(-diff);
+            DateTime domingo = lunes.AddDays(7).AddSeconds(-1);
+            return (lunes, domingo);
+        }
+
+        private DateTime ObtenerInicioSemana(DateTime fecha)
+        {
+            int diff = (int)fecha.DayOfWeek - (int)DayOfWeek.Monday;
+            if (diff < 0) diff += 7;
+            return fecha.AddDays(-diff).Date;
+        }
+        private DateTime ParseFechaHora(string fechaStr, string horaStr)
+        {
+            if (DateTime.TryParse($"{fechaStr} {horaStr}", out var result))
+                return result;
+            return DateTime.Now;
+        }
+        private string ObtenerTituloSemana(DateTime inicio)
+        {
+            var fin = inicio.AddDays(6);
+            return $"📅 Semana del {inicio:dd/MM/yyyy} al {fin:dd/MM/yyyy}";
+        }
+    }
+    public class GrupoFlete : ObservableCollection<FletePendienteUI>
+    {
+        public string Titulo { get; set; }
+
+        public GrupoFlete(string titulo, IEnumerable<FletePendienteUI> items) : base(items)
+        {
+            Titulo = titulo;
+        }
     }
 }
