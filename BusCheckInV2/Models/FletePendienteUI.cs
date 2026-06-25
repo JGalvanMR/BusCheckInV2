@@ -136,7 +136,7 @@ namespace BusCheckInV2.Models
             };
         }
 
-        public string DiaSemana => FechaHora > DateTime.MinValue ? FechaHora.ToString("ddd", new CultureInfo("es-ES")) : "---";
+        public string DiaSemana => FechaHora > DateTime.MinValue ? FechaHora.ToString("dddd", new CultureInfo("es-ES")).ToUpper() : "---";
 
         // ─── PROPIEDAD CALCULADA: Duración del viaje ────────────────────
         public string DuracionViaje

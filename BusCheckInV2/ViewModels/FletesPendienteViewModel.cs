@@ -3,6 +3,9 @@
 
 using BusCheckInV2.Models;
 using BusCheckInV2.Services;
+using BusCheckInV2.Views;
+using BusCheckInV2.Views.Popups;
+using CommunityToolkit.Maui.Extensions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Maui.ApplicationModel;
@@ -688,7 +691,7 @@ namespace BusCheckInV2.ViewModels
         }
 
         [RelayCommand]
-        private async Task VerDetalleFleteAsync(FletePendienteUI flete)
+        private async Task VerDetalleFleteAsyncOG(FletePendienteUI flete)
         {
             if (flete == null) return;
 
@@ -705,6 +708,15 @@ namespace BusCheckInV2.ViewModels
                 $"Duración: {flete.DuracionViaje}";
 
             await _alertService.ShowAlertAsync("Detalle del Flete", detalle);
+        }
+
+        [RelayCommand]
+        private async Task VerDetalleFleteAsync(FletePendienteUI flete)
+        {
+            if (flete == null) return;
+
+            var popup = new FleteDetallePopup(flete);
+            await Application.Current.MainPage.ShowPopupAsync(popup);
         }
 
         [RelayCommand]

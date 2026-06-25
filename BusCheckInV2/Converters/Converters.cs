@@ -1,7 +1,8 @@
-﻿using System;
-using System.Globalization;
+﻿using BusCheckInV2.Models;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.Graphics;
+using System;
+using System.Globalization;
 
 namespace BusCheckInV2.Converters
 {
@@ -231,15 +232,41 @@ namespace BusCheckInV2.Converters
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            if (value is DateTime fecha)
+            // El value debe ser el objeto FletePendienteUI completo
+            if (value is FletePendienteUI flete)
             {
-                if (fecha.DayOfWeek == DayOfWeek.Saturday || fecha.DayOfWeek == DayOfWeek.Sunday)
-                    return Color.FromRgba(255, 0, 0, 50); // Rojo con transparencia
+                // Determinar si es el día de hoy
+                bool esHoy = flete.FechaHora.Date == DateTime.Today;
+
+                // Color según el día de la semana (valores oscuros y saturados)
+                Color color = flete.FechaHora.DayOfWeek switch
+                {
+                    DayOfWeek.Monday => Color.FromArgb("#1E3A8A"),     // Azul oscuro
+                    DayOfWeek.Tuesday => Color.FromArgb("#991B1B"),    // Rojo oscuro
+                    DayOfWeek.Wednesday => Color.FromArgb("#065F46"),  // Verde oscuro
+                    DayOfWeek.Thursday => Color.FromArgb("#7C3AED"),   // Púrpura
+                    DayOfWeek.Friday => Color.FromArgb("#B45309"),     // Naranja oscuro
+                    DayOfWeek.Saturday => Color.FromArgb("#0E7490"),   // Cian oscuro
+                    DayOfWeek.Sunday => Color.FromArgb("#4C0519"),     // Borgoña
+                    _ => Color.FromArgb("#374151")                     // Gris por defecto
+                };
+
+                // Si es hoy, devolvemos un color llamativo (ámbar/dorado) para resaltar
+                if (esHoy)
+                {
+                    return Color.FromArgb("#F59E0B"); // Ámbar brillante
+                }
+
+                return color;
             }
-            return Color.FromRgba(0, 0, 0, 0); // Transparente
+
+            // Si no es el objeto esperado, devolvemos gris
+            return Color.FromArgb("#6B7280");
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
-            => throw new NotImplementedException();
+        {
+            throw new NotImplementedException();
+        }
     }
 }

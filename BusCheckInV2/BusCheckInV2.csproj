@@ -107,4 +107,10 @@
 		<Folder Include="Constants\" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <MauiXaml Update="Views\Popups\FleteDetallePopup.xaml">
+	    <Generator>MSBuild:Compile</Generator>
+	  </MauiXaml>
+	</ItemGroup>
+
 </Project>
