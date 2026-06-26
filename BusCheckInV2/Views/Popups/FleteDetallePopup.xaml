@@ -7,18 +7,19 @@
     xmlns:toolkit="clr-namespace:CommunityToolkit.Maui.Views;assembly=CommunityToolkit.Maui"
     xmlns:vm="clr-namespace:BusCheckInV2.ViewModels.Popups"
     x:DataType="vm:FleteDetallePopupViewModel"
+    Background="Transparent"
     CanBeDismissedByTappingOutsideOfPopup="True"
-    HeightRequest="560"
-    WidthRequest="360">
+    HorizontalOptions="Center"
+    VerticalOptions="Center">
 
     <toolkit:Popup.Resources>
         <ResourceDictionary>
             <converters:StatusToColorConverter x:Key="StatusToColorConverter" />
 
             <!--  Paleta principal  -->
-            <Color x:Key="PrimaryColor">#3B82F6</Color>
-            <Color x:Key="PrimaryDarkColor">#1E40AF</Color>
-            <Color x:Key="AccentColor">#6366F1</Color>
+            <Color x:Key="PrimaryColor">#007AFF</Color>
+            <Color x:Key="PrimaryDarkColor">#30B0C7</Color>
+            <Color x:Key="AccentColor">#FF9500</Color>
             <Color x:Key="SurfaceLight">#FFFFFF</Color>
             <Color x:Key="SurfaceDark">#1A1B23</Color>
             <Color x:Key="SurfaceVariantLight">#F8FAFC</Color>
@@ -30,11 +31,11 @@
             <Color x:Key="TextSecondaryLight">#64748B</Color>
             <Color x:Key="TextSecondaryDark">#94A3B8</Color>
 
-            <!--  Tarjeta principal con gradiente  -->
             <Style x:Key="CardBorder" TargetType="Border">
                 <Setter Property="Padding" Value="0" />
                 <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}" />
                 <Setter Property="StrokeThickness" Value="0" />
+                <Setter Property="Stroke" Value="Transparent" />
                 <Setter Property="StrokeShape">
                     <Setter.Value>
                         <RoundRectangle CornerRadius="24" />
@@ -42,13 +43,6 @@
                 </Setter>
             </Style>
 
-            <!--  Header con gradiente  -->
-            <Style x:Key="HeaderGradient" TargetType="BoxView">
-                <Setter Property="HeightRequest" Value="90" />
-                <Setter Property="Color" Value="Transparent" />
-            </Style>
-
-            <!--  Chips / mini tarjetas para campos  -->
             <Style x:Key="FieldChip" TargetType="Border">
                 <Setter Property="Padding" Value="12,10" />
                 <Setter Property="StrokeThickness" Value="1" />
@@ -61,7 +55,6 @@
                 </Setter>
             </Style>
 
-            <!--  Etiqueta de campo (label pequeño)  -->
             <Style x:Key="FieldLabel" TargetType="Label">
                 <Setter Property="FontSize" Value="10" />
                 <Setter Property="FontAttributes" Value="Bold" />
@@ -70,38 +63,6 @@
                 <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
             </Style>
 
-            <!--  Valor de campo  -->
-            <Style x:Key="FieldValue" TargetType="Label">
-                <Setter Property="FontSize" Value="14" />
-                <Setter Property="LineBreakMode" Value="WordWrap" />
-                <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
-            </Style>
-
-            <!--  Estado badge (outline)  -->
-            <Style x:Key="StatusBadge" TargetType="Border">
-                <Setter Property="Padding" Value="10,4" />
-                <Setter Property="StrokeThickness" Value="0" />
-                <Setter Property="HorizontalOptions" Value="Start" />
-                <Setter Property="VerticalOptions" Value="Center" />
-                <Setter Property="StrokeShape">
-                    <Setter.Value>
-                        <RoundRectangle CornerRadius="12" />
-                    </Setter.Value>
-                </Setter>
-            </Style>
-
-            <!--  Botón principal (filled)  -->
-            <Style x:Key="PrimaryButton" TargetType="Button">
-                <Setter Property="CornerRadius" Value="22" />
-                <Setter Property="FontSize" Value="14" />
-                <Setter Property="FontAttributes" Value="Bold" />
-                <Setter Property="CharacterSpacing" Value="0.5" />
-                <Setter Property="Padding" Value="20,12" />
-                <Setter Property="BackgroundColor" Value="{StaticResource PrimaryColor}" />
-                <Setter Property="TextColor" Value="White" />
-            </Style>
-
-            <!--  Botón tonal  -->
             <Style x:Key="TonalButton" TargetType="Button">
                 <Setter Property="CornerRadius" Value="22" />
                 <Setter Property="FontSize" Value="14" />
@@ -113,23 +74,25 @@
         </ResourceDictionary>
     </toolkit:Popup.Resources>
 
-    <Border Style="{StaticResource CardBorder}">
+    <!--  Tarjeta flotante  -->
+    <Border
+        HorizontalOptions="Center"
+        Style="{StaticResource CardBorder}"
+        VerticalOptions="Center"
+        WidthRequest="320">
         <Border.Shadow>
             <Shadow
                 Opacity="0.25"
-                Radius="32"
-                Offset="0,12" />
+                Radius="24"
+                Offset="0,8" />
         </Border.Shadow>
 
         <Grid RowDefinitions="Auto,Auto,*">
 
-            <!--  ============ HEADER CON GRADIENTE ============  -->
+            <!--  HEADER  -->
             <Grid Grid.Row="0" HeightRequest="100">
-                <!--  Fondo degradado simulado con dos BoxViews  -->
                 <BoxView Color="{StaticResource PrimaryColor}" />
                 <BoxView Opacity="0.85" Color="{StaticResource AccentColor}" />
-
-                <!--  Icono decorativo de fondo  -->
                 <Label
                     Margin="0,-10,-10,0"
                     FontSize="80"
@@ -138,7 +101,6 @@
                     Text="🚍"
                     TextColor="White"
                     VerticalOptions="Start" />
-
                 <VerticalStackLayout
                     Padding="24,18,24,18"
                     Spacing="2"
@@ -173,7 +135,7 @@
                 </VerticalStackLayout>
             </Grid>
 
-            <!--  ============ INDICADOR DE ESTADO (Badge flotante) ============  -->
+            <!--  BADGE DE ESTADO  -->
             <Border
                 Grid.Row="0"
                 Margin="0,70,20,0"
@@ -195,22 +157,20 @@
                     <Ellipse
                         Fill="White"
                         HeightRequest="6"
-                        VerticalOptions="Center"
                         WidthRequest="6" />
                     <Label
                         FontAttributes="Bold"
                         FontSize="11"
                         Text="{Binding Flete.Estatus}"
-                        TextColor="White"
-                        VerticalOptions="Center" />
+                        TextColor="White" />
                 </HorizontalStackLayout>
             </Border>
 
-            <!--  ============ CONTENIDO PRINCIPAL ============  -->
+            <!--  CONTENIDO  -->
             <ScrollView Grid.Row="2" Padding="0">
                 <VerticalStackLayout Padding="20,16,20,16" Spacing="14">
 
-                    <!--  Sección: Información de Ruta  -->
+                    <!--  Ruta  -->
                     <Border Style="{StaticResource FieldChip}">
                         <VerticalStackLayout Spacing="10">
                             <HorizontalStackLayout Spacing="10">
@@ -233,13 +193,12 @@
                         </VerticalStackLayout>
                     </Border>
 
-                    <!--  Grid 2x2: Fecha/Hora y Duración  -->
+                    <!--  Grid 2x2  -->
                     <Grid
                         ColumnDefinitions="*,*"
                         ColumnSpacing="12"
                         RowDefinitions="Auto,Auto"
                         RowSpacing="12">
-
                         <!--  Fecha/Hora  -->
                         <Border
                             Grid.Row="0"
@@ -284,7 +243,7 @@
                                 <Label
                                     FontAttributes="Bold"
                                     FontSize="13"
-                                    Text="{Binding Flete.DuracionViaje}"
+                                    Text="{Binding DuracionViaje}"
                                     TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight},
                                                                 Dark={StaticResource TextPrimaryDark}}" />
                             </VerticalStackLayout>
@@ -343,7 +302,7 @@
                         </Border>
                     </Grid>
 
-                    <!--  Sección: Tipo de Flete  -->
+                    <!--  Tipo de Flete  -->
                     <Border Style="{StaticResource FieldChip}">
                         <HorizontalStackLayout Spacing="12">
                             <Label
@@ -356,14 +315,14 @@
                                     FontAttributes="Bold"
                                     FontSize="13"
                                     LineBreakMode="WordWrap"
-                                    Text="{Binding Flete.TipoFlete} - {Binding Flete.TipoViaje}"
+                                    Text="{Binding TipoCompleto}"
                                     TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight},
                                                                 Dark={StaticResource TextPrimaryDark}}" />
                             </VerticalStackLayout>
                         </HorizontalStackLayout>
                     </Border>
 
-                    <!--  Sección: Pasajeros (barra de progreso visual)  -->
+                    <!--  Pasajeros  -->
                     <Border Style="{StaticResource FieldChip}">
                         <VerticalStackLayout Spacing="10">
                             <HorizontalStackLayout Spacing="8">
@@ -413,17 +372,8 @@
                                     </HorizontalStackLayout>
                                 </VerticalStackLayout>
                             </HorizontalStackLayout>
-                            <Label
-                                FontSize="11"
-                                IsVisible="False"
-                                Text="{Binding Flete.CantidadEsperada, StringFormat='{0} esperados / '}"
-                                TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight},
-                                                            Dark={StaticResource TextSecondaryDark}}" />
                         </VerticalStackLayout>
                     </Border>
-
-                    <!--  Spacer  -->
-                    <BoxView HeightRequest="4" Color="Transparent" />
 
                     <!--  Botón cerrar  -->
                     <Button

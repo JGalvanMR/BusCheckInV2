@@ -27,6 +27,8 @@
 
 		<!-- Keystore: Usar variables de entorno -->
 		<AndroidSigningKeyStore>keystore\GABIRA.keystore</AndroidSigningKeyStore>
+		<NuGetAudit>False</NuGetAudit>
+		<PlatformTarget>x64</PlatformTarget>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net9.0-android|AnyCPU'">
@@ -35,9 +37,9 @@
 		<AndroidSigningStorePass>GABIRA</AndroidSigningStorePass>
 		<AndroidSigningKeyAlias>GABIRA</AndroidSigningKeyAlias>
 		<AndroidSigningKeyPass>GABIRA</AndroidSigningKeyPass>
-		<ApplicationVersion>22</ApplicationVersion>
+		<ApplicationVersion>24</ApplicationVersion>
 		<AndroidUseAapt2>True</AndroidUseAapt2>
-		<ApplicationDisplayVersion>2.1.1</ApplicationDisplayVersion>
+		<ApplicationDisplayVersion>2.2.2</ApplicationDisplayVersion>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net9.0-android|AnyCPU'">
@@ -45,10 +47,10 @@
 		<AndroidSigningStorePass>GABIRA</AndroidSigningStorePass>
 		<AndroidSigningKeyAlias>GABIRA</AndroidSigningKeyAlias>
 		<AndroidSigningKeyPass>GABIRA</AndroidSigningKeyPass>
-		<ApplicationVersion>22</ApplicationVersion>
-		<EmbedAssembliesIntoApk>True</EmbedAssembliesIntoApk>
+		<ApplicationVersion>24</ApplicationVersion>
+		<EmbedAssembliesIntoApk>False</EmbedAssembliesIntoApk>
 		<AndroidUseAapt2>True</AndroidUseAapt2>
-		<ApplicationDisplayVersion>2.1.1</ApplicationDisplayVersion>
+		<ApplicationDisplayVersion>2.2.2</ApplicationDisplayVersion>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -109,6 +111,9 @@
 
 	<ItemGroup>
 	  <MauiXaml Update="Views\Popups\FleteDetallePopup.xaml">
+	    <Generator>MSBuild:Compile</Generator>
+	  </MauiXaml>
+	  <MauiXaml Update="Views\Popups\LoadingPopup.xaml">
 	    <Generator>MSBuild:Compile</Generator>
 	  </MauiXaml>
 	</ItemGroup>

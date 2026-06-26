@@ -10,7 +10,8 @@
     <ContentPage.ToolbarItems>
         <ToolbarItem
             Command="{Binding IrAFletesPendientesCommand}"
-            IconImageSource="bus_alert.png"
+            IconImageSource="{AppThemeBinding Light=bus_alert.png,
+                                              Dark=bus_alert_light.png}"
             Order="Primary"
             Priority="0"
             Text="Fletes Pendientes" />

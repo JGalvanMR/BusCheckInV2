@@ -14,7 +14,7 @@
     <Style TargetType="Border">
         <Setter Property="Stroke" Value="{AppThemeBinding Light={StaticResource Outline}, Dark={StaticResource OutlineDark}}" />
         <Setter Property="StrokeShape" Value="Rectangle" />
-        <Setter Property="StrokeThickness" Value="1" />
+        <Setter Property="StrokeThickness" Value="0" />
     </Style>
 
     <Style TargetType="BoxView">
@@ -438,11 +438,12 @@
         </Setter>
         <Setter Property="Shadow">
             <Setter.Value>
-                <Shadow Brush="{AppThemeBinding Light=#40000000,
-                                                Dark=#80000000}"
-                        Opacity="0.8"
-                        Radius="20"
-                        Offset="0,4" />
+                <Shadow
+                    Brush="{AppThemeBinding Light=#40000000,
+                                            Dark=#80000000}"
+                    Opacity="0.8"
+                    Radius="20"
+                    Offset="0,4" />
             </Setter.Value>
         </Setter>
         <Setter Property="Padding" Value="15" />

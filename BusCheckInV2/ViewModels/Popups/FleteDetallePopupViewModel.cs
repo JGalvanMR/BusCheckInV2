@@ -1,28 +1,29 @@
-﻿using BusCheckInV2.Models;
-using CommunityToolkit.Maui.Extensions;
+﻿using System.Windows.Input;
+using BusCheckInV2.Models;
 using CommunityToolkit.Maui.Views;
 using Microsoft.Maui.Controls;
-using System.Windows.Input;
 
 namespace BusCheckInV2.ViewModels.Popups;
 
 public class FleteDetallePopupViewModel
 {
-    private readonly Popup _popup;
     public FletePendienteUI Flete { get; }
-    public string TextoPasajeros { get; }
     public ICommand CerrarCommand { get; }
+    private readonly Popup _popup;
+    public string TipoCompleto => $"{Flete.TipoFlete} - {Flete.TipoViaje}";
 
-    public FleteDetallePopupViewModel(Popup popup, FletePendienteUI flete)
+    public FleteDetallePopupViewModel(FletePendienteUI flete, Popup popup)
     {
-        _popup = popup;
         Flete = flete;
-        TextoPasajeros = $"{flete.CantidadEsperada} esperados / {flete.CantidadReal ?? 0} reales";
+        _popup = popup;
         CerrarCommand = new Command(Cerrar);
     }
 
     private async void Cerrar()
     {
-        await Application.Current.MainPage.ClosePopupAsync(_popup);
+        if (_popup != null)
+            await _popup.CloseAsync();
+        else
+            await Application.Current.MainPage.Navigation.PopModalAsync();
     }
 }

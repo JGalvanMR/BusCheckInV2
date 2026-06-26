@@ -1,5 +1,8 @@
 ﻿using BusCheckInV2.Models;
 using BusCheckInV2.Services;
+using BusCheckInV2.Views;
+using BusCheckInV2.Views.Popups;
+using CommunityToolkit.Maui.Extensions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Maui.ApplicationModel;
@@ -9,7 +12,6 @@ using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
-using BusCheckInV2.Views;
 
 namespace BusCheckInV2.ViewModels
 {
@@ -85,7 +87,39 @@ namespace BusCheckInV2.ViewModels
         {
             VersionText = $"Version: {AppInfo.VersionString}";
             await VerificarPermisosAsync();
-            await CheckForUpdatesAsync();
+
+            try
+            {
+                bool isUpdateAvailable = await _appUpdateService.IsUpdateAvailableAsync();
+                if (isUpdateAvailable)
+                {
+                    bool confirm = await Application.Current.MainPage.DisplayAlert(
+                        "Actualización Obligatoria",
+                        "Hay una nueva versión disponible. Presiona OK para iniciar la actualización.",
+                        "OK", "Cancelar");
+
+                    if (confirm)
+                    {
+                        await _appUpdateService.DownloadAndInstallAsync();
+                        // Después de iniciar la descarga e instalación, la app se cerrará.
+                        // Si no se cierra (por error), no continuamos con la carga normal.
+                        return;
+                    }
+                    else
+                    {
+                        // Si el usuario cancela, podrías cerrar la app o continuar.
+                        // Aquí decidimos continuar con la versión actual (puedes cambiar según tu política).
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                await Application.Current.MainPage.DisplayAlert("Error",
+                    $"No se pudo verificar o descargar la actualización: {ex.Message}", "OK");
+                // Continuamos con la carga normal para que el usuario pueda usar la app.
+            }
+
+            // Inicialización Normal (Solo si no hay actualización o falló)
             LimpiarControles();
             IsContinuarEnabled = true;
             await LoadProveedoresAsync();
@@ -328,19 +362,50 @@ namespace BusCheckInV2.ViewModels
             return true;
         }
 
+        // 1. Declara esta variable a nivel de clase (fuera del método)
+        private bool _isCheckingUpdate = false;
+
         private async Task CheckForUpdatesAsync()
         {
-            bool isUpdateAvailable = await _appUpdateService.IsUpdateAvailableAsync();
-            if (isUpdateAvailable)
+            // Si ya se está ejecutando el proceso, salimos inmediatamente para evitar el bucle
+            if (_isCheckingUpdate)
+                return;
+
+            try
             {
-                bool userWantsToUpdate = await Application.Current.MainPage.DisplayAlert(
-                    "Actualización Disponible",
-                    "Hay una nueva versión de la aplicación disponible. ¿Deseas actualizar?",
-                    "OK","");
-                if (userWantsToUpdate)
+                _isCheckingUpdate = true; // Ponemos el candado
+
+                bool isUpdateAvailable = await _appUpdateService.IsUpdateAvailableAsync();
+
+                if (isUpdateAvailable)
                 {
+                    // Mostramos la alerta de un solo botón
+                    await Application.Current.MainPage.DisplayAlert(
+                        "Actualización Obligatoria",
+                        "Hay una nueva versión disponible. Presiona OK para iniciar la actualización.",
+                        "OK"
+                    );
+
+                    // Justo aquí abrimos tu Popup de carga (si usas la opción del Popup)
+                    var loadingPopup = new LoadingPopup();
+                    Application.Current.MainPage.ShowPopup(loadingPopup);
+
+                    // Ejecutamos la descarga e instalación
                     await _appUpdateService.DownloadAndInstallAsync();
+
+                    // Opcional: Cerrar popup si por alguna razón el flujo regresa
+                    loadingPopup.CloseAsync();
                 }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error en el flujo de actualización: {ex.Message}");
+            }
+            finally
+            {
+                // IMPORTANTE: Solo liberamos el candado si la actualización NO se completó 
+                // (por si el usuario canceló el permiso en los ajustes de Android y regresó a la app).
+                _isCheckingUpdate = false;
             }
         }
 

@@ -5,7 +5,9 @@ using BusCheckInV2.Models;
 using BusCheckInV2.Services;
 using BusCheckInV2.Views;
 using BusCheckInV2.Views.Popups;
+using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Extensions;
+using CommunityToolkit.Maui.Views;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Maui.ApplicationModel;
@@ -17,6 +19,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
 using System.Threading;
+using Microsoft.Maui.Graphics;
 using System.Threading.Tasks;
 
 namespace BusCheckInV2.ViewModels
@@ -223,7 +226,17 @@ namespace BusCheckInV2.ViewModels
         private async Task CargarFletesPendientesAsync()
         {
             var (inicioSemana, finSemana) = ObtenerSemanaActual();
-            TituloSemanaActual = $"📅 {inicioSemana:ddd dd} / {finSemana:ddd dd} {finSemana:MMM yyyy}";
+            var cultura = new System.Globalization.CultureInfo("es-ES");
+            // Aplicamos la misma lógica de formato con control de cambio de mes
+            if (inicioSemana.Month == finSemana.Month)
+            {
+                TituloSemanaActual = $"📅 {inicioSemana:dd} AL {finSemana:dd} DE {inicioSemana.ToString("MMMM yyyy", cultura)}".ToUpper();
+            }
+            else
+            {
+                // Si cruza de mes (Ej: 29 DE MARZO AL 04 DE ABRIL 2026)
+                TituloSemanaActual = $"📅 {inicioSemana.ToString("dd 'DE' MMMM", cultura)} AL {finSemana.ToString("dd 'DE' MMMM yyyy", cultura)}".ToUpper();
+            }
             // ChoferSeleccionado se actualiza automáticamente desde UsuarioSeleccionado
             if (string.IsNullOrEmpty(ChoferSeleccionado))
             {
@@ -710,12 +723,16 @@ namespace BusCheckInV2.ViewModels
             await _alertService.ShowAlertAsync("Detalle del Flete", detalle);
         }
 
+
+
+
         [RelayCommand]
         private async Task VerDetalleFleteAsync(FletePendienteUI flete)
         {
             if (flete == null) return;
 
             var popup = new FleteDetallePopup(flete);
+            // No pasar PopupOptions para usar el overlay oscuro por defecto
             await Application.Current.MainPage.ShowPopupAsync(popup);
         }
 

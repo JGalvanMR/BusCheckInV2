@@ -254,7 +254,7 @@ namespace BusCheckInV2.Converters
                 // Si es hoy, devolvemos un color llamativo (ámbar/dorado) para resaltar
                 if (esHoy)
                 {
-                    return Color.FromArgb("#F59E0B"); // Ámbar brillante
+                    return Color.FromArgb("#007AFF"); // Ámbar brillante
                 }
 
                 return color;

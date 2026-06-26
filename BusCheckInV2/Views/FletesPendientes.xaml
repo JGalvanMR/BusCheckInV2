@@ -218,18 +218,18 @@
                             <Grid
                                 ColumnDefinitions="Auto,*,Auto"
                                 RowDefinitions="Auto,Auto,Auto"
-                                RowSpacing="0">
+                                RowSpacing="8">
 
                                 <!--  ===== CINTILLA DEL DÍA =====  -->
                                 <Border
                                     Grid.RowSpan="3"
                                     Grid.Column="0"
-                                    Margin="0,0,4,0"
                                     Padding="0"
                                     BackgroundColor="{Binding ., Converter={StaticResource DiaSemanaColorConverter}}"
                                     HorizontalOptions="Fill"
+                                    StrokeThickness="0"
                                     VerticalOptions="Fill"
-                                    WidthRequest="72">
+                                    WidthRequest="40">
                                     <Border.Shadow>
                                         <Shadow
                                             Brush="Black"
@@ -242,8 +242,9 @@
                                     </Border.StrokeShape>
                                     <Label
                                         FontAttributes="Bold"
-                                        FontSize="13"
-                                        HorizontalOptions="Center"
+                                        FontSize="18"
+                                        HorizontalOptions="End"
+                                        LineBreakMode="WordWrap"
                                         Text="{Binding DiaSemana}"
                                         TextColor="White"
                                         VerticalOptions="Center" />
@@ -253,6 +254,7 @@
                                 <VerticalStackLayout
                                     Grid.Row="0"
                                     Grid.Column="1"
+                                    Padding="4,4,0,0"
                                     Spacing="2">
                                     <Label
                                         FontAttributes="Bold"
@@ -270,6 +272,7 @@
                                 <Grid
                                     Grid.Row="0"
                                     Grid.Column="2"
+                                    Padding="0,8,4,0"
                                     ColumnDefinitions="Auto,Auto">
                                     <Label
                                         Grid.Column="0"
@@ -290,6 +293,7 @@
                                     Grid.Row="1"
                                     Grid.Column="1"
                                     Grid.ColumnSpan="2"
+                                    Padding="8,0,4,0"
                                     ColumnDefinitions="*,Auto">
                                     <Label
                                         Grid.Column="0"
@@ -315,6 +319,7 @@
                                     Grid.Row="2"
                                     Grid.Column="1"
                                     Grid.ColumnSpan="2"
+                                    Padding="0,0,0,8"
                                     ColumnDefinitions="*,*"
                                     ColumnSpacing="8">
 
@@ -326,7 +331,7 @@
                                         CommandParameter="{Binding .}"
                                         CornerRadius="20"
                                         FontSize="14"
-                                        Text="Detalle"
+                                        Text="Ver Detalle"
                                         TextColor="{AppThemeBinding Light=#1A73E8,
                                                                     Dark=#8AB4F8}" />
                                     <Button
@@ -349,7 +354,10 @@
         </RefreshView>
 
         <!--  ===================== FOOTER =====================  -->
-        <Border Grid.Row="4" Style="{StaticResource CardBorder}">
+        <Border
+            Grid.Row="4"
+            Padding="12"
+            Style="{StaticResource CardBorder}">
             <Border.Shadow>
                 <Shadow
                     Opacity="0.12"

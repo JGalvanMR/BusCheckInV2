@@ -136,7 +136,8 @@ namespace BusCheckInV2.Models
             };
         }
 
-        public string DiaSemana => FechaHora > DateTime.MinValue ? FechaHora.ToString("dddd", new CultureInfo("es-ES")).ToUpper() : "---";
+        //public string DiaSemana => FechaHora > DateTime.MinValue ? FechaHora.ToString("dddd", new CultureInfo("es-ES")).ToUpper() : "---";
+        public string DiaSemana => FechaHora > DateTime.MinValue ? FechaHora.ToString("ddd dd", new System.Globalization.CultureInfo("es-ES")).ToUpper() : "---";
 
         // ─── PROPIEDAD CALCULADA: Duración del viaje ────────────────────
         public string DuracionViaje
@@ -145,9 +146,21 @@ namespace BusCheckInV2.Models
             {
                 if (!FechaInicio.HasValue)
                     return "Sin iniciar";
+
                 var fin = FechaFin ?? DateTime.Now;
                 var diff = fin - FechaInicio.Value;
-                return $"{diff.Hours}h {diff.Minutes}m";
+
+                // Usamos TotalHours para acumular los días en forma de horas (Ej: 1 día y 2 horas = 26 horas)
+                int totalHoras = (int)diff.TotalHours;
+                int minutos = diff.Minutes;
+
+                // Opcional: Si el viaje dura menos de una hora, puedes mostrar solo los minutos
+                if (totalHoras == 0)
+                {
+                    return $"{minutos}m";
+                }
+
+                return $"{totalHoras}h {minutos}m";
             }
         }
 
