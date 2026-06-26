@@ -1,7 +1,8 @@
-﻿using System;
-using System.Globalization;
+﻿using BusCheckInV2.Models;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.Graphics;
+using System;
+using System.Globalization;
 
 namespace BusCheckInV2.Converters
 {
@@ -30,8 +31,9 @@ namespace BusCheckInV2.Converters
                 var s = status.Trim();
 
                 // Camino 1 (preferido): EstadoCalculado del backend nuevo
-                if (s.Equals("Activo", StringComparison.OrdinalIgnoreCase) ||
-                    s.Equals("En curso", StringComparison.OrdinalIgnoreCase) ||
+                if (s.Equals("Activo", StringComparison.OrdinalIgnoreCase))
+                    return Colors.Green;
+                if (s.Equals("En curso", StringComparison.OrdinalIgnoreCase) ||
                     s.Equals("Pendiente", StringComparison.OrdinalIgnoreCase))
                     return Colors.Red;
                 if (s.Equals("Finalizado", StringComparison.OrdinalIgnoreCase))
@@ -40,7 +42,9 @@ namespace BusCheckInV2.Converters
                     return Colors.Gray;
 
                 // Camino 2: códigos 1 char (Status='P'/'I'/'A'/'F'/'C')
-                if (s == "P" || s == "I" || s == "A")
+                if (s == "A")
+                    return Colors.Green;
+                if (s == "P" || s == "I")
                     return Colors.Red;
                 if (s == "F")
                     return Colors.Green;
@@ -48,10 +52,11 @@ namespace BusCheckInV2.Converters
                     return Colors.Gray;
 
                 // Camino 3: fallback a strings legacy
+                if (s.Contains("Activo", StringComparison.OrdinalIgnoreCase))
+                    return Colors.Green;
                 if (s.Contains("Pendiente", StringComparison.OrdinalIgnoreCase) ||
                     s.Contains("Iniciado", StringComparison.OrdinalIgnoreCase) ||
                     s.Contains("Inconcluso", StringComparison.OrdinalIgnoreCase) ||
-                    s.Contains("Activo", StringComparison.OrdinalIgnoreCase) ||
                     s.Contains("Aprobado", StringComparison.OrdinalIgnoreCase))
                     return Colors.Red;
                 if (s.Contains("Finalizado", StringComparison.OrdinalIgnoreCase) ||
@@ -222,5 +227,46 @@ namespace BusCheckInV2.Converters
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
             => value is bool b && !b;
+    }
+    public class DiaSemanaColorConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            // El value debe ser el objeto FletePendienteUI completo
+            if (value is FletePendienteUI flete)
+            {
+                // Determinar si es el día de hoy
+                bool esHoy = flete.FechaHora.Date == DateTime.Today;
+
+                // Color según el día de la semana (valores oscuros y saturados)
+                Color color = flete.FechaHora.DayOfWeek switch
+                {
+                    DayOfWeek.Monday => Color.FromArgb("#1E3A8A"),     // Azul oscuro
+                    DayOfWeek.Tuesday => Color.FromArgb("#991B1B"),    // Rojo oscuro
+                    DayOfWeek.Wednesday => Color.FromArgb("#065F46"),  // Verde oscuro
+                    DayOfWeek.Thursday => Color.FromArgb("#7C3AED"),   // Púrpura
+                    DayOfWeek.Friday => Color.FromArgb("#B45309"),     // Naranja oscuro
+                    DayOfWeek.Saturday => Color.FromArgb("#0E7490"),   // Cian oscuro
+                    DayOfWeek.Sunday => Color.FromArgb("#4C0519"),     // Borgoña
+                    _ => Color.FromArgb("#374151")                     // Gris por defecto
+                };
+
+                // Si es hoy, devolvemos un color llamativo (ámbar/dorado) para resaltar
+                if (esHoy)
+                {
+                    return Color.FromArgb("#007AFF"); // Ámbar brillante
+                }
+
+                return color;
+            }
+
+            // Si no es el objeto esperado, devolvemos gris
+            return Color.FromArgb("#6B7280");
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

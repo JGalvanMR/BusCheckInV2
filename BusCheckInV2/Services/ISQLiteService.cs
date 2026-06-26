@@ -52,5 +52,8 @@ namespace BusCheckInV2.Services
 
         /// <summary>Limpia entradas de log más antiguas que N días.</summary>
         Task LimpiarSyncLogAntiguoAsync(int diasRetencion = 7);
+
+        Task<int?> ObtenerIdLocalPorIdFletePerAsync(int idFletePer);
+        Task<int> InsertarFleteDesdeUIAsync(FletePendienteUI fleteUI);
     }
 }

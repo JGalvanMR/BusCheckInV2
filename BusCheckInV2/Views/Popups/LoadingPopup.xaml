@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<toolkit:Popup
+    x:Class="BusCheckInV2.Views.Popups.LoadingPopup"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:toolkit="clr-namespace:CommunityToolkit.Maui.Views;assembly=CommunityToolkit.Maui"
+    Background="Transparent"
+    CanBeDismissedByTappingOutsideOfPopup="False"
+    HorizontalOptions="Center"
+    VerticalOptions="Center">
+
+    <Border
+        Padding="24"
+        BackgroundColor="White"
+        StrokeShape="RoundRectangle 12"
+        WidthRequest="250">
+
+        <VerticalStackLayout
+            HorizontalOptions="Center"
+            Spacing="15"
+            VerticalOptions="Center">
+            <ActivityIndicator
+                HeightRequest="50"
+                IsRunning="True"
+                WidthRequest="50"
+                Color="#2196F3" />
+            <Label
+                FontAttributes="Bold"
+                FontSize="16"
+                HorizontalOptions="Center"
+                Text="Descargando actualización..."
+                TextColor="Black" />
+            <Label
+                FontSize="12"
+                HorizontalOptions="Center"
+                Text="Por favor, no cierres la app."
+                TextColor="Gray" />
+        </VerticalStackLayout>
+    </Border>
+
+</toolkit:Popup>

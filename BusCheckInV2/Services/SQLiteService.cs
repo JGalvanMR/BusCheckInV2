@@ -370,7 +370,7 @@ namespace BusCheckInV2.Services
                         Proveedor = nombreProveedor,
                         Chofer = flete.Chofer ?? "Desconocido",
                         Estatus = flete.Status ?? "P",
-                        CantidadEsperada = flete.Cantidad,
+                        CantidadEsperada = (int)flete.Cantidad,
                         CantidadReal = flete.Cantidad,
                         TipoFlete = flete.TipoFlete ?? "NORMAL",
                         TipoViaje = flete.TipoViaje ?? "TRAER GENTE",
@@ -734,7 +734,7 @@ namespace BusCheckInV2.Services
                         Proveedor = nombreProveedor,
                         Chofer = flete.Chofer ?? "Desconocido",
                         Estatus = flete.Status ?? "P",
-                        CantidadEsperada = flete.Cantidad,
+                        CantidadEsperada = (int)flete.Cantidad,
                         CantidadReal = flete.Cantidad,
                         TipoFlete = flete.TipoFlete ?? "NORMAL",
                         TipoViaje = flete.TipoViaje ?? "TRAER GENTE",
@@ -935,5 +935,48 @@ namespace BusCheckInV2.Services
             return "Activo";
         }
         #endregion
+
+        public async Task<int?> ObtenerIdLocalPorIdFletePerAsync(int idFletePer)
+        {
+            try
+            {
+                var flete = await _database.Table<Tb_FlePer_FletePersonal>()
+                    .FirstOrDefaultAsync(f => f.IdFletePer == idFletePer);
+                return flete?.Id;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error obteniendo ID local para IdFletePer={Id}", idFletePer);
+                return null;
+            }
+        }
+
+        public async Task<int> InsertarFleteDesdeUIAsync(FletePendienteUI fleteUI)
+        {
+            try
+            {
+                var flete = new Tb_FlePer_FletePersonal
+                {
+                    IdFletePer = fleteUI.IdFletePer,
+                    Fecha = fleteUI.FechaHora.Date,
+                    Hora = fleteUI.FechaHora.TimeOfDay,
+                    ProvClave = fleteUI.Proveedor,  // Ajusta según tu mapeo
+                    IdDestFlete = 0, // Debes obtenerlo de alguna relación, si no, dejar 0
+                    TipoFlete = fleteUI.TipoFlete,
+                    TipoViaje = fleteUI.TipoViaje,
+                    Cantidad = fleteUI.CantidadEsperada,
+                    Status = fleteUI.Estatus,
+                    Chofer = fleteUI.Chofer,
+                    IsSynced = true // Porque viene de la API, ya está sincronizado
+                };
+                await _database.InsertAsync(flete);
+                return flete.Id;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error insertando flete desde UI");
+                return 0;
+            }
+        }
     }
 }

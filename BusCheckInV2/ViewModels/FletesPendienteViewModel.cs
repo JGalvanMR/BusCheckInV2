@@ -3,6 +3,11 @@
 
 using BusCheckInV2.Models;
 using BusCheckInV2.Services;
+using BusCheckInV2.Views;
+using BusCheckInV2.Views.Popups;
+using CommunityToolkit.Maui;
+using CommunityToolkit.Maui.Extensions;
+using CommunityToolkit.Maui.Views;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Maui.ApplicationModel;
@@ -14,6 +19,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
 using System.Threading;
+using Microsoft.Maui.Graphics;
 using System.Threading.Tasks;
 
 namespace BusCheckInV2.ViewModels
@@ -26,6 +32,9 @@ namespace BusCheckInV2.ViewModels
         private readonly INavigationService _navigationService;
         private readonly CancellationTokenSource _gpsTokenSource = new();
         private bool _disposed;
+        private bool _finalizandoEnCurso;
+        [ObservableProperty]
+        private string _tituloSemanaActual = string.Empty;
 
         // FIX 2026-06-01 (Problema #3b del usuario): previene que el botón
         // Actualizar y el pull-to-refresh del RefreshView disparen dos cargas
@@ -112,7 +121,10 @@ namespace BusCheckInV2.ViewModels
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[AutoLoad] {ex.Message}");
+                await MainThread.InvokeOnMainThreadAsync(() =>
+                {
+                    MensajeEstado = $"Error auto-carga: {ex.Message}";
+                });
             }
         }
         // ─────────────────────────────────────────────────────────────────
@@ -122,6 +134,9 @@ namespace BusCheckInV2.ViewModels
         // de conexión. Lo mantenemos sincronizado con HayConexionInternet.
         [ObservableProperty]
         private Color _colorEstadoConexion = Colors.Orange;
+
+
+
         // ─────────────────────────────────────────────────────────────────
 
         // ─── CONSTRUCTOR SIN CAMBIOS ──────────────────────────────────────
@@ -210,6 +225,18 @@ namespace BusCheckInV2.ViewModels
         [RelayCommand]
         private async Task CargarFletesPendientesAsync()
         {
+            var (inicioSemana, finSemana) = ObtenerSemanaActual();
+            var cultura = new System.Globalization.CultureInfo("es-ES");
+            // Aplicamos la misma lógica de formato con control de cambio de mes
+            if (inicioSemana.Month == finSemana.Month)
+            {
+                TituloSemanaActual = $"📅 {inicioSemana:dd} AL {finSemana:dd} DE {inicioSemana.ToString("MMMM yyyy", cultura)}".ToUpper();
+            }
+            else
+            {
+                // Si cruza de mes (Ej: 29 DE MARZO AL 04 DE ABRIL 2026)
+                TituloSemanaActual = $"📅 {inicioSemana.ToString("dd 'DE' MMMM", cultura)} AL {finSemana.ToString("dd 'DE' MMMM yyyy", cultura)}".ToUpper();
+            }
             // ChoferSeleccionado se actualiza automáticamente desde UsuarioSeleccionado
             if (string.IsNullOrEmpty(ChoferSeleccionado))
             {
@@ -229,6 +256,7 @@ namespace BusCheckInV2.ViewModels
                 EstaCargando = true;
                 MensajeEstado = "Cargando fletes...";
                 FletesPendientes.Clear();
+
 
                 var fletes = new System.Collections.Generic.List<FletePendienteUI>();
 
@@ -451,9 +479,10 @@ namespace BusCheckInV2.ViewModels
         // ─── COMANDOS RESTANTES SIN CAMBIOS DE LÓGICA ────────────────────
 
         [RelayCommand]
-        private async Task ValidarYFinalizarFleteAsync(FletePendienteUI flete)
+        private async Task ValidarYFinalizarFleteAsyncOG(FletePendienteUI flete)
         {
-            if (flete == null) return;
+            if (flete == null || _finalizandoEnCurso) return;
+            _finalizandoEnCurso = true;
 
             var cantidad = await _alertService.ShowPromptAsync(
                 "Validar Flete",
@@ -491,11 +520,23 @@ namespace BusCheckInV2.ViewModels
 
                 if (exito)
                 {
-                    await _databaseService.ActualizarEstadoFleteAsync(
-                        flete.Id, "Completado", cantidadValidada, observaciones);
+                    await _databaseService.ActualizarEstadoFleteAsync((int)flete.Id, "Completado", cantidadValidada, observaciones);
                     flete.Estatus = "Completado";
                     flete.CantidadReal = cantidadValidada;
                     flete.FechaFin = DateTime.Now;
+
+                    // FIX: recalcular o forzar EsPendiente a false
+                    // Opción A: si tienes setter en EsPendiente, haz flete.EsPendiente = false;
+                    // Opción B: removerlo de la lista visible porque ya no es pendiente.
+                    if (MostrarSoloPendientes)
+                    {
+                        FletesPendientes.Remove(flete);
+                    }
+                    else
+                    {
+                        flete.EsPendiente = false; // Asegúrate de que la propiedad tenga setter público.
+                    }
+
 
                     await _alertService.ShowAlertAsync(
                         "Éxito",
@@ -507,6 +548,124 @@ namespace BusCheckInV2.ViewModels
             finally
             {
                 EstaCargando = false;
+                _finalizandoEnCurso = false;
+            }
+        }
+
+        [RelayCommand]
+        private async Task ValidarYFinalizarFleteAsync(FletePendienteUI flete)
+        {
+            if (flete == null || _finalizandoEnCurso) return;
+            _finalizandoEnCurso = true;
+
+            try
+            {
+                // 1. Verificar que el flete tenga ID del backend (indispensable)
+                if (!flete.IdFletePer.HasValue)
+                {
+                    await _alertService.ShowAlertAsync("Error", "El flete no tiene ID en el servidor.");
+                    return;
+                }
+
+                // 2. Pedir cantidad
+                var cantidad = await _alertService.ShowPromptAsync(
+                    "Validar Flete",
+                    $"Ingrese cantidad real para:\n{flete.Ruta}\n(Esperados: {flete.CantidadEsperada})",
+                    keyboard: Keyboard.Numeric);
+
+                if (string.IsNullOrEmpty(cantidad) || !int.TryParse(cantidad, out int cantidadValidada))
+                    return;
+
+                var observaciones = await _alertService.ShowPromptAsync(
+                    "Observaciones",
+                    "Ingrese observaciones (opcional):",
+                    placeholder: "Observaciones del viaje...");
+
+                var confirmar = await _alertService.ShowConfirmationAsync(
+                    "Confirmar Finalización",
+                    $"¿Finalizar flete con {cantidadValidada} pasajeros?\n{flete.Ruta}");
+
+                if (!confirmar) return;
+
+                EstaCargando = true;
+
+                // 3. Asegurar que el flete tiene ID local (crearlo si no existe)
+                if (!flete.Id.HasValue)
+                {
+                    // Intentar buscar en BD local por IdFletePer
+                    var localId = await _databaseService.ObtenerIdLocalPorIdFletePerAsync(flete.IdFletePer.Value);
+                    if (localId.HasValue)
+                    {
+                        flete.Id = localId.Value;
+                    }
+                    else
+                    {
+                        // Insertar nuevo registro local desde el objeto UI
+                        var nuevoId = await _databaseService.InsertarFleteDesdeUIAsync(flete);
+                        if (nuevoId > 0)
+                            flete.Id = nuevoId;
+                        else
+                        {
+                            await _alertService.ShowAlertAsync("Error", "No se pudo guardar el flete localmente.");
+                            return;
+                        }
+                    }
+                }
+
+                // 4. Obtener GPS
+                var (lat, lon) = await GetLatLonOrZeroAsync();
+
+                // 5. Finalizar en servidor (si hay conexión)
+                bool exito = true;
+                if (HayConexionInternet && _apiService != null)
+                {
+                    exito = await _apiService.ValidarYFinalizarFleteAsync(
+                        flete.IdFletePer.Value,
+                        cantidadValidada,
+                        observaciones ?? "",
+                        lat,
+                        lon);
+                }
+
+                if (exito)
+                {
+                    // 6. Actualizar BD local (usando Id local ya seguro)
+                    await _databaseService.ActualizarEstadoFleteAsync(
+                        flete.Id.Value,
+                        "Completado",
+                        cantidadValidada,
+                        observaciones);
+
+                    // 7. Actualizar objeto UI
+                    flete.Estatus = "Completado";
+                    flete.CantidadReal = cantidadValidada;
+                    flete.FechaFin = DateTime.Now;
+                    flete.EstadoCalculado = "Finalizado";
+                    flete.EsPendiente = false;
+
+                    // 8. Si estamos en "Solo pendientes", remover de la lista
+                    if (MostrarSoloPendientes)
+                        FletesPendientes.Remove(flete);
+
+                    await _alertService.ShowAlertAsync(
+                        "Éxito",
+                        HayConexionInternet
+                            ? "Flete finalizado en servidor y localmente"
+                            : "Flete finalizado localmente (se sincronizará después)");
+                }
+                else
+                {
+                    await _alertService.ShowAlertAsync("Error", "No se pudo finalizar el flete en el servidor.");
+                }
+            }
+            catch (Exception ex)
+            {
+                await _alertService.ShowAlertAsync("Error", $"Error al finalizar: {ex.Message}");
+            }
+            finally
+            {
+                EstaCargando = false;
+                _finalizandoEnCurso = false;
             }
         }
 
@@ -526,9 +685,13 @@ namespace BusCheckInV2.ViewModels
                 }
 
                 var sincronizados = await _databaseService.SincronizarConApiAsync(_apiService);
-                await _alertService.ShowAlertAsync(
-                    "Sincronización",
-                    $"Completada. {sincronizados} fletes sincronizados");
+                await _alertService.ShowAlertAsync("Sincronización", $"Completada. {sincronizados} fletes sincronizados");
+
+                // NUEVO: Recargar fletes automáticamente
+                if (!_cargaFletesEnCurso)
+                {
+                    await CargarFletesPendientesAsync();
+                }
             }
             catch (Exception ex)
             {
@@ -541,7 +704,7 @@ namespace BusCheckInV2.ViewModels
         }
 
         [RelayCommand]
-        private async Task VerDetalleFleteAsync(FletePendienteUI flete)
+        private async Task VerDetalleFleteAsyncOG(FletePendienteUI flete)
         {
             if (flete == null) return;
 
@@ -558,6 +721,19 @@ namespace BusCheckInV2.ViewModels
                 $"Duración: {flete.DuracionViaje}";
 
             await _alertService.ShowAlertAsync("Detalle del Flete", detalle);
+        }
+
+
+
+
+        [RelayCommand]
+        private async Task VerDetalleFleteAsync(FletePendienteUI flete)
+        {
+            if (flete == null) return;
+
+            var popup = new FleteDetallePopup(flete);
+            // No pasar PopupOptions para usar el overlay oscuro por defecto
+            await Application.Current.MainPage.ShowPopupAsync(popup);
         }
 
         [RelayCommand]
@@ -599,10 +775,45 @@ namespace BusCheckInV2.ViewModels
             }
             catch { /* ya disposed, ignorar */ }
         }
-        //public override void Dispose()
-        //{
-        //    Connectivity.ConnectivityChanged -= OnConnectivityChanged;
-        //    base.Dispose();
-        //}
+
+        // ─── NUEVO MÉTODO: Obtener semana actual (Lunes a Domingo) ────────
+        private (DateTime Inicio, DateTime Fin) ObtenerSemanaActual()
+        {
+            var hoy = DateTime.Now.Date;
+            int diff = (int)hoy.DayOfWeek - (int)DayOfWeek.Monday;
+            if (diff < 0) diff += 7;
+            DateTime lunes = hoy.AddDays(-diff);
+            DateTime domingo = lunes.AddDays(7).AddSeconds(-1);
+            return (lunes, domingo);
+        }
+
+        private DateTime ObtenerInicioSemana(DateTime fecha)
+        {
+            int diff = (int)fecha.DayOfWeek - (int)DayOfWeek.Monday;
+            if (diff < 0) diff += 7;
+            return fecha.AddDays(-diff).Date;
+        }
+        private DateTime ParseFechaHora(string fechaStr, string horaStr)
+        {
+            if (DateTime.TryParse($"{fechaStr} {horaStr}", out var result))
+                return result;
+            return DateTime.Now;
+        }
+        private string ObtenerTituloSemana(DateTime inicio)
+        {
+            var fin = inicio.AddDays(6);
+            //return $"📅 \n Semana del {inicio:dd/MM/yyyy} al {fin:dd/MM/yyyy}";
+            // Se adaptará automáticamente según la cultura del dispositivo
+            return $"📅 Semana del {inicio:d} al {fin:d}";
+        }
+    }
+    public class GrupoFlete : ObservableCollection<FletePendienteUI>
+    {
+        public string Titulo { get; set; }
+
+        public GrupoFlete(string titulo, IEnumerable<FletePendienteUI> items) : base(items)
+        {
+            Titulo = titulo;
+        }
     }
 }

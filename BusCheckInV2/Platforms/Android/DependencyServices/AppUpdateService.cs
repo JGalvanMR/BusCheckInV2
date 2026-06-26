@@ -65,7 +65,7 @@ namespace BusCheckInV2.Platforms.Android.Services
 
         public async Task DownloadAndInstallAsync()
         {
-            string apkUrl = "http://189.206.160.206:81/EmbarquesApk/BusCheckIn/com.mrlucky.buscheckinV2.apk";
+            string apkUrl = "http://189.206.160.206:81/EmbarquesApk/BusCheckInV2/com.mrlucky.buscheckinV2.apk";
             string apkName = "com.mrlucky.buscheckinV2.apk";
 
             try
