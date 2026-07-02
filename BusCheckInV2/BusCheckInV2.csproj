@@ -37,9 +37,9 @@
 		<AndroidSigningStorePass>GABIRA</AndroidSigningStorePass>
 		<AndroidSigningKeyAlias>GABIRA</AndroidSigningKeyAlias>
 		<AndroidSigningKeyPass>GABIRA</AndroidSigningKeyPass>
-		<ApplicationVersion>24</ApplicationVersion>
+		<ApplicationVersion>25</ApplicationVersion>
 		<AndroidUseAapt2>True</AndroidUseAapt2>
-		<ApplicationDisplayVersion>2.2.2</ApplicationDisplayVersion>
+		<ApplicationDisplayVersion>2.2.3</ApplicationDisplayVersion>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net9.0-android|AnyCPU'">
@@ -47,10 +47,10 @@
 		<AndroidSigningStorePass>GABIRA</AndroidSigningStorePass>
 		<AndroidSigningKeyAlias>GABIRA</AndroidSigningKeyAlias>
 		<AndroidSigningKeyPass>GABIRA</AndroidSigningKeyPass>
-		<ApplicationVersion>24</ApplicationVersion>
+		<ApplicationVersion>25</ApplicationVersion>
 		<EmbedAssembliesIntoApk>False</EmbedAssembliesIntoApk>
 		<AndroidUseAapt2>True</AndroidUseAapt2>
-		<ApplicationDisplayVersion>2.2.2</ApplicationDisplayVersion>
+		<ApplicationDisplayVersion>2.2.3</ApplicationDisplayVersion>
 	</PropertyGroup>
 
 	<ItemGroup>
