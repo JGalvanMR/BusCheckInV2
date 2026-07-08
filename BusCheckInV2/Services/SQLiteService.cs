@@ -109,8 +109,9 @@ namespace BusCheckInV2.Services
             await InsertInitialDataIfNeededAsync(new List<Tb_Cat_Proveedor>
             {
                 new Tb_Cat_Proveedor { ProvClave = "TURISTICOS", ProvNombre = "JUAN CARLOS ACOSTA CABRERA" },
-                new Tb_Cat_Proveedor { ProvClave = "10810", ProvNombre = "RIVERA MONTESINO MARGARITA JACQUELINE" },
-                new Tb_Cat_Proveedor { ProvClave = "RAMIROGE", ProvNombre = "RAMIRO GARCIA ESTRADA" }
+                //new Tb_Cat_Proveedor { ProvClave = "10810", ProvNombre = "RIVERA MONTESINO MARGARITA JACQUELINE" },
+                new Tb_Cat_Proveedor { ProvClave = "RAMIROGE", ProvNombre = "RAMIRO GARCIA ESTRADA" },
+                new Tb_Cat_Proveedor { ProvClave = "11958", ProvNombre = "OMNIBUS DEL CENTRO" }
                 // Otros proveedores
             });
 
@@ -134,31 +135,37 @@ namespace BusCheckInV2.Services
                 new Tb_FlePer_Ruta { IdDestFlete = 16, NomDestFlete = "LIMPIEZA NOCTURNA", FleteCant = 2, FleteCosto = 530.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
                 new Tb_FlePer_Ruta { IdDestFlete = 17, NomDestFlete = "LOMA DE FLORES", FleteCant = 2, FleteCosto = 530.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
                 new Tb_FlePer_Ruta { IdDestFlete = 18, NomDestFlete = "LOMA DE FLORES - MENDOZA", FleteCant = 2, FleteCosto = 530.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
-                new Tb_FlePer_Ruta { IdDestFlete = 19, NomDestFlete = "Cardenas-DoñaRosa-San Vicente", FleteCant = 2, FleteCosto = 1100.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" }
+                new Tb_FlePer_Ruta { IdDestFlete = 19, NomDestFlete = "Cardenas-DoñaRosa-San Vicente", FleteCant = 2, FleteCosto = 1155.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 20, NomDestFlete = "Soledad", FleteCant = 2, FleteCosto = 850.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 21, NomDestFlete = "Ruta Personal Administrativo", FleteCant = 2, FleteCosto = 556.50m, DestStatus = "A", RutaCupo = 14, RutaVehiculo = "COMBI" },
+                new Tb_FlePer_Ruta { IdDestFlete = 22, NomDestFlete = "Ruta Guardería 1", FleteCant = 2, FleteCosto = 400.00m, DestStatus = "A", RutaCupo = 14, RutaVehiculo = "COMBI" },
+                new Tb_FlePer_Ruta { IdDestFlete = 23, NomDestFlete = "Ruta Guardería 2", FleteCant = 2, FleteCosto = 400.00m, DestStatus = "A", RutaCupo = 14, RutaVehiculo = "COMBI" },
+                new Tb_FlePer_Ruta { IdDestFlete = 24, NomDestFlete = "Ruta Guardería 3", FleteCant = 2, FleteCosto = 400.00m, DestStatus = "A", RutaCupo = 14, RutaVehiculo = "COMBI" }
                 // Otros rutas
             });
 
             await InsertInitialDataIfNeededAsync(new List<Tb_FlePer_ProvRuta>
             {
-                new Tb_FlePer_ProvRuta { IdRutaProv = 1, Prov_Clave = "10810", IdDestFlete = 1, RutaStatus = "A" },
-                new Tb_FlePer_ProvRuta { IdRutaProv = 2, Prov_Clave = "10810", IdDestFlete = 2, RutaStatus = "A" },
-                new Tb_FlePer_ProvRuta { IdRutaProv = 3, Prov_Clave = "10810", IdDestFlete = 3, RutaStatus = "A" },
-                new Tb_FlePer_ProvRuta { IdRutaProv = 4, Prov_Clave = "10810", IdDestFlete = 4, RutaStatus = "A" },
-                new Tb_FlePer_ProvRuta { IdRutaProv = 5, Prov_Clave = "10810", IdDestFlete = 5, RutaStatus = "B" },
-                new Tb_FlePer_ProvRuta { IdRutaProv = 6, Prov_Clave = "10810", IdDestFlete = 6, RutaStatus = "B" },
-                new Tb_FlePer_ProvRuta { IdRutaProv = 7, Prov_Clave = "10810", IdDestFlete = 7, RutaStatus = "B" },
-                new Tb_FlePer_ProvRuta { IdRutaProv = 8, Prov_Clave = "10810", IdDestFlete = 8, RutaStatus = "A" },
-                new Tb_FlePer_ProvRuta { IdRutaProv = 9, Prov_Clave = "10810", IdDestFlete = 9, RutaStatus = "B" },
-                new Tb_FlePer_ProvRuta { IdRutaProv = 10, Prov_Clave = "10810", IdDestFlete = 10, RutaStatus = "A" },
-                new Tb_FlePer_ProvRuta { IdRutaProv = 11, Prov_Clave = "10810", IdDestFlete = 11, RutaStatus = "A" },
                 new Tb_FlePer_ProvRuta { IdRutaProv = 12, Prov_Clave = "TURISTICOS", IdDestFlete = 12, RutaStatus = "A" },
-                new Tb_FlePer_ProvRuta { IdRutaProv = 13, Prov_Clave = "TURISTICOS", IdDestFlete = 13, RutaStatus = "A" },
                 new Tb_FlePer_ProvRuta { IdRutaProv = 14, Prov_Clave = "TURISTICOS", IdDestFlete = 14, RutaStatus = "A" },
-                new Tb_FlePer_ProvRuta { IdRutaProv = 15, Prov_Clave = "10810", IdDestFlete = 15, RutaStatus = "A" },
                 new Tb_FlePer_ProvRuta { IdRutaProv = 16, Prov_Clave = "RAMIROGE", IdDestFlete = 16, RutaStatus = "A" },
                 new Tb_FlePer_ProvRuta { IdRutaProv = 17, Prov_Clave = "RAMIROGE", IdDestFlete = 17, RutaStatus = "A" },
+                new Tb_FlePer_ProvRuta { IdRutaProv = 25, Prov_Clave = "TURISTICOS", IdDestFlete = 17, RutaStatus = "A" },
+                
+                new Tb_FlePer_ProvRuta { IdRutaProv = 31, Prov_Clave = "11958", IdDestFlete = 1, RutaStatus = "A"},
+                new Tb_FlePer_ProvRuta { IdRutaProv = 32, Prov_Clave = "11958", IdDestFlete = 2, RutaStatus = "A"},
+                new Tb_FlePer_ProvRuta { IdRutaProv = 33, Prov_Clave = "11958", IdDestFlete = 3, RutaStatus = "A"},
+                new Tb_FlePer_ProvRuta { IdRutaProv = 34, Prov_Clave = "11958", IdDestFlete = 4, RutaStatus = "A"},
+                new Tb_FlePer_ProvRuta { IdRutaProv = 35, Prov_Clave = "11958", IdDestFlete = 19, RutaStatus = "A"},
+                new Tb_FlePer_ProvRuta { IdRutaProv = 36, Prov_Clave = "11958", IdDestFlete = 8, RutaStatus = "A"},
+                new Tb_FlePer_ProvRuta { IdRutaProv = 37, Prov_Clave = "11958", IdDestFlete = 10, RutaStatus = "A"},
+                new Tb_FlePer_ProvRuta { IdRutaProv = 38, Prov_Clave = "11958", IdDestFlete = 11, RutaStatus = "A"},
+                new Tb_FlePer_ProvRuta { IdRutaProv = 39, Prov_Clave = "11958", IdDestFlete = 21, RutaStatus = "A"},
+                new Tb_FlePer_ProvRuta { IdRutaProv = 40, Prov_Clave = "11958", IdDestFlete = 22, RutaStatus = "A"},
+                new Tb_FlePer_ProvRuta { IdRutaProv = 41, Prov_Clave = "11958", IdDestFlete = 23, RutaStatus = "A"},
+                new Tb_FlePer_ProvRuta { IdRutaProv = 42, Prov_Clave = "11958", IdDestFlete = 24, RutaStatus = "A"},
+
                 new Tb_FlePer_ProvRuta { IdRutaProv = 18, Prov_Clave = "RAMIROGE", IdDestFlete = 18, RutaStatus = "A" },
-                new Tb_FlePer_ProvRuta { IdRutaProv = 23, Prov_Clave = "10810", IdDestFlete = 19, RutaStatus = "A" }
                 // Otros prov rutas
             });
         }
