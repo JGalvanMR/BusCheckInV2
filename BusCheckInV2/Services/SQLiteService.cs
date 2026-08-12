@@ -164,6 +164,7 @@ namespace BusCheckInV2.Services
                 new Tb_FlePer_ProvRuta { IdRutaProv = 40, Prov_Clave = "11958", IdDestFlete = 22, RutaStatus = "A"},
                 new Tb_FlePer_ProvRuta { IdRutaProv = 41, Prov_Clave = "11958", IdDestFlete = 23, RutaStatus = "A"},
                 new Tb_FlePer_ProvRuta { IdRutaProv = 42, Prov_Clave = "11958", IdDestFlete = 24, RutaStatus = "A"},
+                new Tb_FlePer_ProvRuta { IdRutaProv = 43, Prov_Clave = "11958", IdDestFlete = 18, RutaStatus = "A"},
 
                 new Tb_FlePer_ProvRuta { IdRutaProv = 18, Prov_Clave = "RAMIROGE", IdDestFlete = 18, RutaStatus = "A" },
                 // Otros prov rutas
