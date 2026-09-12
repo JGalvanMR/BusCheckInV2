@@ -37,9 +37,9 @@
 		<AndroidSigningStorePass>GABIRA</AndroidSigningStorePass>
 		<AndroidSigningKeyAlias>GABIRA</AndroidSigningKeyAlias>
 		<AndroidSigningKeyPass>GABIRA</AndroidSigningKeyPass>
-		<ApplicationVersion>26</ApplicationVersion>
+		<ApplicationVersion>30</ApplicationVersion>
 		<AndroidUseAapt2>True</AndroidUseAapt2>
-		<ApplicationDisplayVersion>2.2.4</ApplicationDisplayVersion>
+		<ApplicationDisplayVersion>2.2.8</ApplicationDisplayVersion>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net9.0-android|AnyCPU'">
@@ -47,10 +47,10 @@
 		<AndroidSigningStorePass>GABIRA</AndroidSigningStorePass>
 		<AndroidSigningKeyAlias>GABIRA</AndroidSigningKeyAlias>
 		<AndroidSigningKeyPass>GABIRA</AndroidSigningKeyPass>
-		<ApplicationVersion>26</ApplicationVersion>
+		<ApplicationVersion>30</ApplicationVersion>
 		<EmbedAssembliesIntoApk>False</EmbedAssembliesIntoApk>
 		<AndroidUseAapt2>True</AndroidUseAapt2>
-		<ApplicationDisplayVersion>2.2.4</ApplicationDisplayVersion>
+		<ApplicationDisplayVersion>2.2.8</ApplicationDisplayVersion>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -72,22 +72,32 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <AndroidResource Remove="ConnectedServices\**" />
-	  <Compile Remove="ConnectedServices\**" />
-	  <EmbeddedResource Remove="ConnectedServices\**" />
-	  <MauiCss Remove="ConnectedServices\**" />
-	  <MauiXaml Remove="ConnectedServices\**" />
-	  <None Remove="ConnectedServices\**" />
+		<AndroidResource Remove="ConnectedServices\**" />
+		<Compile Remove="ConnectedServices\**" />
+		<EmbeddedResource Remove="ConnectedServices\**" />
+		<MauiCss Remove="ConnectedServices\**" />
+		<MauiXaml Remove="ConnectedServices\**" />
+		<None Remove="ConnectedServices\**" />
 	</ItemGroup>
 
 	<ItemGroup>
-	  <Compile Remove="Services\ApiFleteServiceReal.cs" />
+		<Compile Remove="Services\ApiFleteServiceReal.cs" />
 	</ItemGroup>
 
 	<ItemGroup>
-	  <None Remove="Resources\AppIcon\appiconbcia.png" />
-	  <None Remove="Resources\AppIcon\appicons.png" />
-	  <None Remove="Resources\Splash\splashbcia.png" />
+		<MauiAsset Remove="Resources\Raw\FomVacaciones3.cer" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Remove="Platforms\Android\Resources\raw\FomVacaciones3.cer" />
+		<None Remove="Platforms\Android\Resources\xml\network_security_config.xml" />
+		<None Remove="Resources\AppIcon\appiconbcia.png" />
+		<None Remove="Resources\AppIcon\appicons.png" />
+		<None Remove="Resources\Raw\FomVacaciones3.cer" />
+		<None Remove="Resources\Raw\scanner.mp3" />
+		<None Remove="Resources\Splash\splashbcia.png" />
+		<None Remove="Resources\xml\file_paths.xml" />
+		<None Remove="Resources\xml\network_security_config.xml" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -107,15 +117,16 @@
 
 	<ItemGroup>
 		<Folder Include="Constants\" />
+		<Folder Include="Resources\xml\" />
 	</ItemGroup>
 
 	<ItemGroup>
-	  <MauiXaml Update="Views\Popups\FleteDetallePopup.xaml">
-	    <Generator>MSBuild:Compile</Generator>
-	  </MauiXaml>
-	  <MauiXaml Update="Views\Popups\LoadingPopup.xaml">
-	    <Generator>MSBuild:Compile</Generator>
-	  </MauiXaml>
+		<MauiXaml Update="Views\Popups\FleteDetallePopup.xaml">
+			<Generator>MSBuild:Compile</Generator>
+		</MauiXaml>
+		<MauiXaml Update="Views\Popups\LoadingPopup.xaml">
+			<Generator>MSBuild:Compile</Generator>
+		</MauiXaml>
 	</ItemGroup>
 
 </Project>

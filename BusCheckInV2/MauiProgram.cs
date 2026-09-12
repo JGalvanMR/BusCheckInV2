@@ -3,6 +3,7 @@ using BusCheckInV2.Platforms.Android.Services;
 using BusCheckInV2.Services;
 using BusCheckInV2.ViewModels;
 using BusCheckInV2.Views;
+using BusCheckInV2.Helpers;
 using CommunityToolkit.Maui;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -43,7 +44,14 @@ public static class MauiProgram
         {
             client.DefaultRequestHeaders.Add("User-Agent", "BusCheckInV2-MAUI");
         })
-        .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler())
+        .ConfigurePrimaryHttpMessageHandler(() =>
+        {
+#if ANDROID
+            return new HttpsClientHandlerService().GetPlatformMessageHandler();
+#else
+    return new HttpClientHandler();
+#endif
+        })
         .AddPolicyHandler(GetRetryPolicy());
 
         // Servicios de datos
