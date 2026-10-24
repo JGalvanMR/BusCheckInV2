@@ -37,7 +37,7 @@
 		<AndroidSigningStorePass>GABIRA</AndroidSigningStorePass>
 		<AndroidSigningKeyAlias>GABIRA</AndroidSigningKeyAlias>
 		<AndroidSigningKeyPass>GABIRA</AndroidSigningKeyPass>
-		<ApplicationVersion>30</ApplicationVersion>
+		<ApplicationVersion>31</ApplicationVersion>
 		<AndroidUseAapt2>True</AndroidUseAapt2>
 		<ApplicationDisplayVersion>2.2.8</ApplicationDisplayVersion>
 	</PropertyGroup>
@@ -47,7 +47,7 @@
 		<AndroidSigningStorePass>GABIRA</AndroidSigningStorePass>
 		<AndroidSigningKeyAlias>GABIRA</AndroidSigningKeyAlias>
 		<AndroidSigningKeyPass>GABIRA</AndroidSigningKeyPass>
-		<ApplicationVersion>30</ApplicationVersion>
+		<ApplicationVersion>31</ApplicationVersion>
 		<EmbedAssembliesIntoApk>False</EmbedAssembliesIntoApk>
 		<AndroidUseAapt2>True</AndroidUseAapt2>
 		<ApplicationDisplayVersion>2.2.8</ApplicationDisplayVersion>
