@@ -111,28 +111,29 @@ namespace BusCheckInV2.Services
                 new Tb_Cat_Proveedor { ProvClave = "TURISTICOS", ProvNombre = "JUAN CARLOS ACOSTA CABRERA" },
                 //new Tb_Cat_Proveedor { ProvClave = "10810", ProvNombre = "RIVERA MONTESINO MARGARITA JACQUELINE" },
                 new Tb_Cat_Proveedor { ProvClave = "RAMIROGE", ProvNombre = "RAMIRO GARCIA ESTRADA" },
-                new Tb_Cat_Proveedor { ProvClave = "11958", ProvNombre = "OMNIBUS DEL CENTRO" }
+                new Tb_Cat_Proveedor { ProvClave = "11958", ProvNombre = "OMNIBUS DEL CENTRO" },
+                new Tb_Cat_Proveedor { ProvClave = "3413", ProvNombre = "ACOSTA CABRERA LUIS MIGUEL" }
                 // Otros proveedores
-            });
+            }, p => p.ProvClave);
 
             await InsertInitialDataIfNeededAsync(new List<Tb_FlePer_Ruta>
             {
-                new Tb_FlePer_Ruta { IdDestFlete = 1, NomDestFlete = "Yostiro", FleteCant = 4, FleteCosto = 900.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
-                new Tb_FlePer_Ruta { IdDestFlete = 2, NomDestFlete = "Carrizal - Peñuelas", FleteCant = 4, FleteCosto = 825.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
-                new Tb_FlePer_Ruta { IdDestFlete = 3, NomDestFlete = "4ta Brigada", FleteCant = 2, FleteCosto = 530.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
-                new Tb_FlePer_Ruta { IdDestFlete = 4, NomDestFlete = "Estanco - La Mesa", FleteCant = 2, FleteCosto = 530.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 1, NomDestFlete = "Yostiro", FleteCant = 4, FleteCosto = 866.25m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 2, NomDestFlete = "Carrizal - Peñuelas", FleteCant = 4, FleteCosto = 556.50m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 3, NomDestFlete = "4ta Brigada", FleteCant = 2, FleteCosto = 556.50m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 4, NomDestFlete = "Estanco - La Mesa", FleteCant = 2, FleteCosto = 1207.50m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
                 new Tb_FlePer_Ruta { IdDestFlete = 5, NomDestFlete = "Doña Rosa - San Vicente", FleteCant = 2, FleteCosto = 550.00m, DestStatus = "B", RutaCupo = 20, RutaVehiculo = "CAMIONETA" },
                 new Tb_FlePer_Ruta { IdDestFlete = 6, NomDestFlete = "Soledad", FleteCant = 0, FleteCosto = 530.00m, DestStatus = "B", RutaCupo = 38, RutaVehiculo = "CAMION" },
                 new Tb_FlePer_Ruta { IdDestFlete = 7, NomDestFlete = "Zona Centro", FleteCant = 0, FleteCosto = 530.00m, DestStatus = "B", RutaCupo = 0, RutaVehiculo = "" },
-                new Tb_FlePer_Ruta { IdDestFlete = 8, NomDestFlete = "Tomelopitos", FleteCant = 2, FleteCosto = 530.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 8, NomDestFlete = "Tomelopitos", FleteCant = 2, FleteCosto = 556.50m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
                 new Tb_FlePer_Ruta { IdDestFlete = 9, NomDestFlete = "Cardenas", FleteCant = 2, FleteCosto = 530.00m, DestStatus = "A", RutaCupo = 20, RutaVehiculo = "CAMIONETA" },
-                new Tb_FlePer_Ruta { IdDestFlete = 10, NomDestFlete = "Oreja - Mocha", FleteCant = 4, FleteCosto = 530.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
-                new Tb_FlePer_Ruta { IdDestFlete = 11, NomDestFlete = "Mendoza Temascatio", FleteCant = 2, FleteCosto = 530.00m, DestStatus = "A", RutaCupo = 38, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 10, NomDestFlete = "Oreja - Mocha", FleteCant = 4, FleteCosto = 556.50m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 11, NomDestFlete = "Mendoza Temascatio", FleteCant = 2, FleteCosto = 556.50m, DestStatus = "A", RutaCupo = 38, RutaVehiculo = "CAMION" },
                 new Tb_FlePer_Ruta { IdDestFlete = 12, NomDestFlete = "San Cayetano - Apatzingan", FleteCant = 2, FleteCosto = 530.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMIONETA" },
                 new Tb_FlePer_Ruta { IdDestFlete = 13, NomDestFlete = "Purísima - Malvas", FleteCant = 1, FleteCosto = 530.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMIONETA" },
                 new Tb_FlePer_Ruta { IdDestFlete = 14, NomDestFlete = "San Juan - Nicolas", FleteCant = 4, FleteCosto = 650.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMIONETA" },
-                new Tb_FlePer_Ruta { IdDestFlete = 15, NomDestFlete = "Soledad - Centro", FleteCant = 2, FleteCosto = 1150.00m, DestStatus = "A", RutaCupo = 38, RutaVehiculo = "CAMION" },
-                new Tb_FlePer_Ruta { IdDestFlete = 16, NomDestFlete = "LIMPIEZA NOCTURNA", FleteCant = 2, FleteCosto = 530.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 15, NomDestFlete = "Soledad - Centro", FleteCant = 2, FleteCosto = 1207.50m, DestStatus = "A", RutaCupo = 38, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 16, NomDestFlete = "LIMPIEZA NOCTURNA", FleteCant = 2, FleteCosto = 556.50m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
                 new Tb_FlePer_Ruta { IdDestFlete = 17, NomDestFlete = "LOMA DE FLORES", FleteCant = 2, FleteCosto = 530.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
                 new Tb_FlePer_Ruta { IdDestFlete = 18, NomDestFlete = "LOMA DE FLORES - MENDOZA", FleteCant = 2, FleteCosto = 530.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
                 new Tb_FlePer_Ruta { IdDestFlete = 19, NomDestFlete = "Cardenas-DoñaRosa-San Vicente", FleteCant = 2, FleteCosto = 1155.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
@@ -140,9 +141,19 @@ namespace BusCheckInV2.Services
                 new Tb_FlePer_Ruta { IdDestFlete = 21, NomDestFlete = "Ruta Personal Administrativo", FleteCant = 2, FleteCosto = 556.50m, DestStatus = "A", RutaCupo = 14, RutaVehiculo = "COMBI" },
                 new Tb_FlePer_Ruta { IdDestFlete = 22, NomDestFlete = "Ruta Guardería 1", FleteCant = 2, FleteCosto = 400.00m, DestStatus = "A", RutaCupo = 14, RutaVehiculo = "COMBI" },
                 new Tb_FlePer_Ruta { IdDestFlete = 23, NomDestFlete = "Ruta Guardería 2", FleteCant = 2, FleteCosto = 400.00m, DestStatus = "A", RutaCupo = 14, RutaVehiculo = "COMBI" },
-                new Tb_FlePer_Ruta { IdDestFlete = 24, NomDestFlete = "Ruta Guardería 3", FleteCant = 2, FleteCosto = 400.00m, DestStatus = "A", RutaCupo = 14, RutaVehiculo = "COMBI" }
+                new Tb_FlePer_Ruta { IdDestFlete = 24, NomDestFlete = "Ruta Guardería 3", FleteCant = 2, FleteCosto = 400.00m, DestStatus = "A", RutaCupo = 14, RutaVehiculo = "COMBI" },
+                new Tb_FlePer_Ruta { IdDestFlete = 25, NomDestFlete = "CARRIZAL", FleteCant = 2, FleteCosto = 556.50m, DestStatus = "A", RutaCupo = 38, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 26, NomDestFlete = "Loma de Flores - Mendoza", FleteCant = 2, FleteCosto = 556.50m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 27, NomDestFlete = "San Vicente Doña Rosa y Cardenas", FleteCant = 6, FleteCosto = 1155.00m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 28, NomDestFlete = "Estanco", FleteCant = 2, FleteCosto = 1207.50m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 29, NomDestFlete = "Tomelopez", FleteCant = 2, FleteCosto = 556.50m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 30, NomDestFlete = "Mocha", FleteCant = 2, FleteCosto = 556.50m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 31, NomDestFlete = "YOSTIRO", FleteCant = 2, FleteCosto = 866.25m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 32, NomDestFlete = "Luis Miguel Acosta", FleteCant = 4, FleteCosto = 556.50m, DestStatus = "A" },
+                new Tb_FlePer_Ruta { IdDestFlete = 33, NomDestFlete = "LOMA DE FLORES", FleteCant = 4, FleteCosto = 556.50m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" },
+                new Tb_FlePer_Ruta { IdDestFlete = 34, NomDestFlete = "MENDOZA", FleteCant = 4, FleteCosto = 556.50m, DestStatus = "A", RutaCupo = 40, RutaVehiculo = "CAMION" }
                 // Otros rutas
-            });
+            }, r => r.IdDestFlete);
 
             await InsertInitialDataIfNeededAsync(new List<Tb_FlePer_ProvRuta>
             {
@@ -164,19 +175,33 @@ namespace BusCheckInV2.Services
                 new Tb_FlePer_ProvRuta { IdRutaProv = 40, Prov_Clave = "11958", IdDestFlete = 22, RutaStatus = "A"},
                 new Tb_FlePer_ProvRuta { IdRutaProv = 41, Prov_Clave = "11958", IdDestFlete = 23, RutaStatus = "A"},
                 new Tb_FlePer_ProvRuta { IdRutaProv = 42, Prov_Clave = "11958", IdDestFlete = 24, RutaStatus = "A"},
-                new Tb_FlePer_ProvRuta { IdRutaProv = 43, Prov_Clave = "11958", IdDestFlete = 18, RutaStatus = "A"},
+                new Tb_FlePer_ProvRuta { IdRutaProv = 43, Prov_Clave = "11958", IdDestFlete = 17, RutaStatus = "A"},
+                new Tb_FlePer_ProvRuta { IdRutaProv = 44, Prov_Clave = "11958", IdDestFlete = 25, RutaStatus = "A"},
+                new Tb_FlePer_ProvRuta { IdRutaProv = 45, Prov_Clave = "11958", IdDestFlete = 16, RutaStatus = "A"},
+                new Tb_FlePer_ProvRuta { IdRutaProv = 46, Prov_Clave = "11958", IdDestFlete = 27, RutaStatus = "A"},
+                new Tb_FlePer_ProvRuta { IdRutaProv = 47, Prov_Clave = "11958", IdDestFlete = 18, RutaStatus = "A"},
+                new Tb_FlePer_ProvRuta { IdRutaProv = 49, Prov_Clave = "11958", IdDestFlete = 28, RutaStatus = "A"},
+                new Tb_FlePer_ProvRuta { IdRutaProv = 50, Prov_Clave = "11958", IdDestFlete = 29, RutaStatus = "A"},
+                new Tb_FlePer_ProvRuta { IdRutaProv = 51, Prov_Clave = "11958", IdDestFlete = 31, RutaStatus = "A"},
+                new Tb_FlePer_ProvRuta { IdRutaProv = 52, Prov_Clave = "11958", IdDestFlete = 30, RutaStatus = "A"},
+
+                new Tb_FlePer_ProvRuta { IdRutaProv = 53, Prov_Clave = "3413", IdDestFlete = 16, RutaStatus = "A"},
+                new Tb_FlePer_ProvRuta { IdRutaProv = 54, Prov_Clave = "3413", IdDestFlete = 33, RutaStatus = "A"},
+                new Tb_FlePer_ProvRuta { IdRutaProv = 55, Prov_Clave = "3413", IdDestFlete = 34, RutaStatus = "A"},
 
                 new Tb_FlePer_ProvRuta { IdRutaProv = 18, Prov_Clave = "RAMIROGE", IdDestFlete = 18, RutaStatus = "A" },
                 // Otros prov rutas
-            });
+            }, pr => (pr.Prov_Clave, pr.IdDestFlete));
         }
 
-        private async Task InsertInitialDataIfNeededAsync<T>(List<T> initialData) where T : new()
+        // Inserta solo los registros iniciales que aún no existen (según su llave de negocio)
+        private async Task InsertInitialDataIfNeededAsync<T, TKey>(List<T> initialData, Func<T, TKey> keySelector) where T : new()
         {
-            var count = await _database.Table<T>().CountAsync();
-            if (count == 0)
+            var existingKeys = (await _database.Table<T>().ToListAsync()).Select(keySelector).ToHashSet();
+            var missing = initialData.Where(item => !existingKeys.Contains(keySelector(item))).ToList();
+            if (missing.Count > 0)
             {
-                await _database.InsertAllAsync(initialData);
+                await _database.InsertAllAsync(missing);
             }
         }
 
